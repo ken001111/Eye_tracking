@@ -87,13 +87,15 @@ class GazeTracking(object):
             left_eye_region = eyes.get('left_eye')
             if left_eye_region is not None and left_eye_region.size > 0:
                 left_coords = self.tracker.get_eye_region_coords(self.face_bbox, 'left')
+                left_pupil = self.tracker.get_pupil_location(self.frame, self.face_bbox, 'left')
                 try:
                     self.eye_left = Eye(
                         self.frame,
                         eye_region=left_eye_region,
                         side=0,
                         calibration=self.calibration,
-                        eye_coords=left_coords
+                        eye_coords=left_coords,
+                        pupil_coords=left_pupil
                     )
                 except Exception as e:
                     # If Eye initialization fails, try with just coordinates
@@ -120,13 +122,15 @@ class GazeTracking(object):
             right_eye_region = eyes.get('right_eye')
             if right_eye_region is not None and right_eye_region.size > 0:
                 right_coords = self.tracker.get_eye_region_coords(self.face_bbox, 'right')
+                right_pupil = self.tracker.get_pupil_location(self.frame, self.face_bbox, 'right')
                 try:
                     self.eye_right = Eye(
                         self.frame,
                         eye_region=right_eye_region,
                         side=1,
                         calibration=self.calibration,
-                        eye_coords=right_coords
+                        eye_coords=right_coords,
+                        pupil_coords=right_pupil
                     )
                 except Exception as e:
                     self.eye_right = None
@@ -420,41 +424,33 @@ class GazeTracking(object):
         if frame is None:
             return None
 
-        # Draw eye center dots (yellow)
-        if self.eye_left is not None and self.eye_left.origin is not None:
-            center = self.eye_left_center()
-            if center:
-                cv2.circle(frame, center, 3, (255, 255, 0), -1)
-        
-        if self.eye_right is not None and self.eye_right.origin is not None:
-            center = self.eye_right_center()
-            if center:
-                cv2.circle(frame, center, 3, (255, 255, 0), -1)
-
-        # Draw pupils in green (only circles, no rectangles)
+        # Draw pupils in green with blue center dot
         if self.pupils_located:
-            color = (0, 255, 0)  # Green in BGR
+            color = (0, 255, 0)  # Green for circle
+            dot_color = (255, 255, 0)  # Cyan/Blue for center dot (matching what user likely saw)
             x_left, y_left = self.pupil_left_coords()
             x_right, y_right = self.pupil_right_coords()
             
-            # Only draw pupils if eyes are open - just circles, no crosshairs
+            # Only draw pupils if eyes are open
             if x_left is not None and y_left is not None and self.left_eye_state() == 1:
-                # Draw circle for pupil only
+                # Draw circle for pupil
                 if self.eye_left.pupil.diameter is not None and self.eye_left.pupil.diameter > 0:
                     radius = max(3, int(self.eye_left.pupil.diameter / 2))
                     cv2.circle(frame, (x_left, y_left), radius, color, 2)
                 else:
-                    # Default circle if diameter not available
                     cv2.circle(frame, (x_left, y_left), 5, color, 2)
+                # Draw center dot
+                cv2.circle(frame, (x_left, y_left), 2, dot_color, -1)
             
             if x_right is not None and y_right is not None and self.right_eye_state() == 1:
-                # Draw circle for pupil only
+                # Draw circle for pupil
                 if self.eye_right.pupil.diameter is not None and self.eye_right.pupil.diameter > 0:
                     radius = max(3, int(self.eye_right.pupil.diameter / 2))
                     cv2.circle(frame, (x_right, y_right), radius, color, 2)
                 else:
-                    # Default circle if diameter not available
                     cv2.circle(frame, (x_right, y_right), 5, color, 2)
+                # Draw center dot
+                cv2.circle(frame, (x_right, y_right), 2, dot_color, -1)
 
         return frame
 

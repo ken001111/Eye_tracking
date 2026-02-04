@@ -23,14 +23,16 @@ class GazeTrackingGUI:
     Main GUI application for gaze tracking.
     """
     
-    def __init__(self, root):
+    def __init__(self, root, tracker_type=None):
         """
         Initialize GUI.
         
         Args:
             root: Tkinter root window
+            tracker_type: Override default tracker type
         """
         self.root = root
+        self.tracker_type = tracker_type
         self.root.title("Gaze Tracking System")
         self.root.geometry("1200x800")
         
@@ -63,6 +65,37 @@ class GazeTrackingGUI:
         
         # Auto-start webcam after a short delay (allows GUI to fully render)
         self.root.after(500, self._auto_start_webcam)
+
+    
+    def _initialize_system(self):
+        """Initialize gaze tracking system"""
+        try:
+            # Use provided tracker type or fall back to config default
+            tracker = self.tracker_type if self.tracker_type else config.DEFAULT_TRACKER
+            self.gaze = GazeTracking(tracker_type=tracker)
+            self.safety_monitor = SafetyMonitor(
+                out_of_frame_threshold=config.OUT_OF_FRAME_THRESHOLD,
+                perclos_threshold=config.PERCLOS_THRESHOLD,
+                sustained_seconds=getattr(config, 'DROWSINESS_SUSTAINED_SECONDS', 3.0),
+                alarm_cooldown=getattr(config, 'DROWSINESS_ALARM_COOLDOWN', 10.0),
+                enable_audio=config.ENABLE_AUDIO_ALARMS,
+                enable_visual=config.ENABLE_VISUAL_ALARMS
+            )
+            self.data_logger = DataLogger(
+                buffer_size=config.DATA_LOG_BUFFER_SIZE,
+                auto_flush=config.DATA_LOG_AUTO_FLUSH
+            )
+            self.performance_monitor = PerformanceMonitor(
+                target_fps=config.TARGET_FPS,
+                min_fps=config.MIN_FPS,
+                distance_range=config.DISTANCE_RANGE_INCHES
+            )
+            self.status_label.config(text="System initialized - Starting webcam...", foreground="green")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to initialize system: {e}")
+            self.status_label.config(text="Initialization failed", foreground="red")
+
+
     
     def _create_widgets(self):
         """Create GUI widgets"""
@@ -178,7 +211,9 @@ class GazeTrackingGUI:
     def _initialize_system(self):
         """Initialize gaze tracking system"""
         try:
-            self.gaze = GazeTracking(tracker_type=config.DEFAULT_TRACKER)
+            # Use provided tracker type or fall back to config default
+            tracker = self.tracker_type if self.tracker_type else config.DEFAULT_TRACKER
+            self.gaze = GazeTracking(tracker_type=tracker)
             self.safety_monitor = SafetyMonitor(
                 out_of_frame_threshold=config.OUT_OF_FRAME_THRESHOLD,
                 perclos_threshold=config.PERCLOS_THRESHOLD,
@@ -549,10 +584,10 @@ class GazeTrackingGUI:
         self.root.destroy()
 
 
-def main():
+def main(tracker_type=None):
     """Main entry point for GUI application"""
     root = tk.Tk()
-    app = GazeTrackingGUI(root)
+    app = GazeTrackingGUI(root, tracker_type=tracker_type)
     root.protocol("WM_DELETE_WINDOW", app.on_closing)
     root.mainloop()
 

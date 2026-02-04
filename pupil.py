@@ -8,14 +8,16 @@ class Pupil(object):
     the position of the pupil and calculates its diameter.
     """
 
-    def __init__(self, eye_frame, threshold):
+    def __init__(self, eye_frame, threshold, x=None, y=None, diameter=None):
         self.iris_frame = None
         self.threshold = threshold
-        self.x = None
-        self.y = None
-        self.diameter = None  # Diameter in pixels
-
-        self.detect_iris(eye_frame)
+        self.x = x
+        self.y = y
+        self.diameter = diameter
+        
+        # Only perform detection if coordinates not provided
+        if self.x is None or self.y is None:
+            self.detect_iris(eye_frame)
 
     @staticmethod
     def image_processing(eye_frame, threshold):

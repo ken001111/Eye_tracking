@@ -61,6 +61,20 @@ class BaseTracker(ABC):
         """
         pass
     
+    def get_pupil_location(self, frame: np.ndarray, face_bbox: Tuple[int, int, int, int], eye_side: str) -> Optional[Tuple[int, int, float]]:
+        """
+        Get precise pupil location and diameter from tracker if available.
+        
+        Args:
+            frame: Input frame
+            face_bbox: Face bounding box
+            eye_side: 'left' or 'right'
+            
+        Returns:
+            Tuple of (absolute_x, absolute_y, diameter) or None
+        """
+        return None
+    
     @abstractmethod
     def get_eye_state(self, eye_frame: np.ndarray) -> int:
         """

@@ -18,7 +18,7 @@ class Eye(object):
     LEFT_EYE_POINTS = [36, 37, 38, 39, 40, 41]
     RIGHT_EYE_POINTS = [42, 43, 44, 45, 46, 47]
 
-    def __init__(self, original_frame, eye_region=None, landmarks=None, side=0, calibration=None, eye_coords=None):
+    def __init__(self, original_frame, eye_region=None, landmarks=None, side=0, calibration=None, eye_coords=None, pupil_coords=None):
         """
         Initialize eye detection.
         
@@ -29,6 +29,7 @@ class Eye(object):
             side: 0 for left eye, 1 for right eye
             calibration: Calibration object for threshold
             eye_coords: Eye region coordinates (x, y, w, h) if eye_region is provided
+            pupil_coords: Optional (x, y, diameter) tuple of pupil in absolute coordinates
         """
         self.frame = None
         self.origin = None
@@ -39,7 +40,7 @@ class Eye(object):
         self.ear = None  # Eye Aspect Ratio
         self.side = side
 
-        self._analyze(original_frame, eye_region, landmarks, side, calibration, eye_coords)
+        self._analyze(original_frame, eye_region, landmarks, side, calibration, eye_coords, pupil_coords)
 
     @staticmethod
     def _middle_point(p1, p2):
@@ -111,6 +112,10 @@ class Eye(object):
             eye_coords: Eye coordinates (x, y, w, h) in original frame
         """
         self.frame = eye_region.copy() if eye_region is not None else None
+        
+        # Ensure grayscale
+        if self.frame is not None and len(self.frame.shape) == 3:
+            self.frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
         
         if eye_coords is not None:
             self.origin = (eye_coords[0], eye_coords[1])
@@ -193,17 +198,9 @@ class Eye(object):
 
         return ratio
 
-    def _analyze(self, original_frame, eye_region=None, landmarks=None, side=0, calibration=None, eye_coords=None):
+    def _analyze(self, original_frame, eye_region=None, landmarks=None, side=0, calibration=None, eye_coords=None, pupil_coords=None):
         """Detects and isolates the eye in a new frame, sends data to the calibration
         and initializes Pupil object.
-        
-        Arguments:
-            original_frame: Frame passed by the user
-            eye_region: Pre-extracted eye region (optional)
-            landmarks: Facial landmarks (optional)
-            side: Indicates whether it's the left eye (0) or the right eye (1)
-            calibration: Manages the binarization threshold value
-            eye_coords: Eye region coordinates if eye_region is provided
         """
         # Convert frame to grayscale if needed
         if len(original_frame.shape) == 3:
@@ -240,14 +237,21 @@ class Eye(object):
                 # Higher EAR = open eye, lower EAR = closed eye
                 self.blinking = self.ear * 5.0  # Scale factor for compatibility
         
+        # Use provided pupil coordinates if available
+        px, py, pdiameter = None, None, None
+        if pupil_coords is not None and self.origin is not None:
+            abs_x, abs_y, pdiameter = pupil_coords
+            px = abs_x - self.origin[0]
+            py = abs_y - self.origin[1]
+            
         # Calibration and pupil detection
         if self.frame is not None and calibration is not None:
             if not calibration.is_complete():
                 calibration.evaluate(self.frame, side)
             
             threshold = calibration.threshold(side)
-            self.pupil = Pupil(self.frame, threshold)
+            self.pupil = Pupil(self.frame, threshold, x=px, y=py, diameter=pdiameter)
         elif self.frame is not None:
             # Use default threshold if no calibration
             default_threshold = 50
-            self.pupil = Pupil(self.frame, default_threshold)
+            self.pupil = Pupil(self.frame, default_threshold, x=px, y=py, diameter=pdiameter)

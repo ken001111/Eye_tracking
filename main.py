@@ -7,6 +7,7 @@ import sys
 import argparse
 from gui_app import main as gui_main
 
+import config
 
 def main():
     """Main entry point"""
@@ -21,9 +22,9 @@ def main():
     )
     parser.add_argument(
         '--tracker',
-        choices=['dnn', 'haar', 'hybrid'],
-        default='dnn',
-        help='Tracker method to use (default: dnn)'
+        choices=['dnn', 'haar', 'hybrid', 'mediapipe'],
+        default=config.DEFAULT_TRACKER,
+        help=f'Tracker method to use (default: {config.DEFAULT_TRACKER})'
     )
     
     args = parser.parse_args()
@@ -32,7 +33,7 @@ def main():
         # Launch GUI application
         print("Starting Gaze Tracking System (GUI mode)...")
         print(f"Using tracker: {args.tracker}")
-        gui_main()
+        gui_main(tracker_type=args.tracker)
     elif args.mode == 'cli':
         # CLI mode (can be implemented later)
         print("CLI mode not yet implemented. Use --mode gui for GUI application.")

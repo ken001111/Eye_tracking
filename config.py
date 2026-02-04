@@ -4,7 +4,7 @@ Contains all configurable parameters.
 """
 
 # Tracker Configuration
-DEFAULT_TRACKER = 'dnn'  # Options: 'dnn', 'haar', 'hybrid'
+DEFAULT_TRACKER = 'mediapipe'  # Options: 'dnn', 'haar', 'hybrid', 'mediapipe'
 TRACKER_MODEL_DIR = None  # None = use default locations
 
 # Performance Settings
