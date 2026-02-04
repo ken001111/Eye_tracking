@@ -37,7 +37,20 @@ pip install -r requirements.txt
 python main.py --mode gui
 ```
 
-## Quick Start
+## How to Run (Recommended)
+ 
+ The easiest way to run the application is using the provided shell script, which automatically handles the virtual environment and dependencies:
+ 
+ ```bash
+ ./run_tracking.sh
+ ```
+ 
+ This script will:
+ 1. Check if a virtual environment exists (and create one if needed)
+ 2. Install/update required dependencies
+ 3. Launch the application with the correct Python interpreter
+ 
+ ## Quick Start (Manual)
 
 ### GUI Application
 
