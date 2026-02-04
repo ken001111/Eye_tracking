@@ -341,7 +341,7 @@ class OpenCVDNNTracker(BaseTracker):
     
     def get_eye_state(self, eye_frame: np.ndarray) -> int:
         """
-        Classify eye state as Open (1) or Closed (0) using EAR.
+        Classify eye state as Open (1) or Closed (0) using improved EAR and multi-method detection.
         
         Args:
             eye_frame: Grayscale eye region
@@ -352,14 +352,62 @@ class OpenCVDNNTracker(BaseTracker):
         if eye_frame is None or eye_frame.size == 0:
             return 0
         
-        # Calculate Eye Aspect Ratio
+        try:
+            import config
+            ear_threshold = getattr(config, 'EAR_THRESHOLD', 0.25)
+            ear_threshold_closed = getattr(config, 'EAR_THRESHOLD_CLOSED', 0.20)
+            use_multi_method = getattr(config, 'USE_MULTI_METHOD_DETECTION', True)
+            hist_threshold = getattr(config, 'HISTOGRAM_THRESHOLD', 0.3)
+            contour_threshold = getattr(config, 'CONTOUR_AREA_THRESHOLD', 0.08)
+        except ImportError:
+            # Fallback values if config not available
+            ear_threshold = 0.25
+            ear_threshold_closed = 0.20
+            use_multi_method = True
+            hist_threshold = 0.3
+            contour_threshold = 0.08
+        
+        # Method 1: Calculate Eye Aspect Ratio
         ear = self.calculate_eye_aspect_ratio(eye_frame)
         
-        # Threshold for open/closed (can be calibrated)
-        # Typical EAR: 0.2-0.4 for open, <0.2 for closed
-        threshold = 0.2
+        # Clear thresholds
+        if ear < ear_threshold_closed:
+            return 0  # Definitely closed
+        elif ear > ear_threshold:
+            # Likely open, but verify with other methods if enabled
+            if use_multi_method:
+                # Additional verification
+                pass
+            else:
+                return 1
         
-        return 1 if ear > threshold else 0
+        # Method 2: Histogram analysis (if multi-method enabled)
+        if use_multi_method:
+            hist_variance = np.var(eye_frame)
+            hist_max = np.max(eye_frame)
+            if hist_max > 0:
+                hist_normalized = hist_variance / hist_max
+                if hist_normalized < hist_threshold:
+                    return 0  # Low variance = closed eye
+        
+        # Method 3: Contour analysis
+        if use_multi_method:
+            try:
+                _, thresh = cv2.threshold(eye_frame, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                
+                if contours:
+                    total_area = sum(cv2.contourArea(c) for c in contours)
+                    frame_area = eye_frame.shape[0] * eye_frame.shape[1]
+                    if frame_area > 0:
+                        area_ratio = total_area / frame_area
+                        if area_ratio < contour_threshold:
+                            return 0  # Low contour area = closed eye
+            except Exception:
+                pass
+        
+        # Final decision based on EAR
+        return 1 if ear > ear_threshold else 0
     
     def get_landmarks(self, frame: np.ndarray, face_bbox: Tuple[int, int, int, int]) -> Optional[np.ndarray]:
         """

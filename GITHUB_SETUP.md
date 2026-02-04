@@ -23,7 +23,7 @@ git status
 git commit -m "Initial commit: Enhanced Gaze Tracking System
 
 - Modular tracker architecture (DNN, Haar, Hybrid)
-- Real-time pupil diameter and gaze angle calculation
+- Real-time pupil diameter calculation with moving graphs
 - Safety monitoring (out-of-frame, drowsiness detection)
 - CSV export for EEG/TEP/EMG correlation
 - GUI application with real-time visualization

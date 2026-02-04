@@ -12,7 +12,7 @@ A modular, real-time eye tracking system using OpenCV with support for multiple 
 
 - **Multiple Tracking Methods**: Support for OpenCV DNN (ML), Haar Cascade (non-ML), and Hybrid approaches
 - **Real-time Performance**: Target 100Hz processing (minimum 50Hz)
-- **Advanced Metrics**: Pupil diameter, gaze angle, eye state classification
+- **Advanced Metrics**: Pupil diameter, eye state classification (independent per eye)
 - **Safety Monitoring**: Out-of-frame detection and drowsiness monitoring with distinct alarms
 - **Data Export**: CSV export with high-precision timestamps for correlation with EEG/TEP/EMG data
 - **GUI Application**: User-friendly interface with real-time visualization
@@ -30,7 +30,7 @@ A modular, real-time eye tracking system using OpenCV with support for multiple 
 
 ```bash
 # Clone the repository
-git clone https://github.com/ken001111/Gaze_Tracking
+git clone https://github.com/ken001111/Eye_Tracking
 cd GazeTracking
 
 # Install dependencies
@@ -69,8 +69,8 @@ python gui_app.py
 
 The webcam will start automatically. The system will:
 - Detect your face and eyes
-- Track pupil position and diameter
-- Calculate gaze angles
+- Track pupil position and diameter (with real-time graphs)
+- Monitor eye state independently for each eye
 - Monitor for drowsiness and out-of-frame conditions
 - Display all metrics in real-time
 
@@ -93,9 +93,10 @@ while True:
     # Get metrics
     left_pupil = gaze.pupil_left_coords()
     right_pupil = gaze.pupil_right_coords()
-    diameter = gaze.pupil_diameter()
-    gaze_angle = gaze.gaze_angle()
-    eye_state = gaze.eye_state()  # 1 = open, 0 = closed
+    left_diameter = gaze.pupil_left_diameter()
+    right_diameter = gaze.pupil_right_diameter()
+    left_eye_state = gaze.left_eye_state()  # 1 = open, 0 = closed
+    right_eye_state = gaze.right_eye_state()  # 1 = open, 0 = closed
     
     # Display annotated frame
     annotated = gaze.annotated_frame()
@@ -115,7 +116,7 @@ cv2.destroyAllWindows()
 This system meets the following requirements:
 
 - ✅ Simultaneous identification of pupil and eye coordinates
-- ✅ Continuous calculation of pupil diameter and gaze angle
+- ✅ Continuous calculation of pupil diameter with real-time graphs
 - ✅ Binary classification of eye state (Open vs. Closed)
 - ✅ Performance: 50Hz minimum (target 100Hz)
 - ✅ Real-time processing
@@ -160,7 +161,6 @@ CSV files contain the following columns:
 - `left_pupil_x`, `left_pupil_y`: Left pupil coordinates
 - `right_pupil_x`, `right_pupil_y`: Right pupil coordinates
 - `left_pupil_diameter`, `right_pupil_diameter`: Pupil diameters in pixels
-- `gaze_angle_horizontal`, `gaze_angle_vertical`: Gaze angles in degrees
 - `eye_state`: 1 for open, 0 for closed
 - `drowsiness_score`: Drowsiness score (0.0-1.0)
 - `fps`: Current FPS

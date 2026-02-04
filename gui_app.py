@@ -7,9 +7,10 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import cv2
 import numpy as np
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageDraw
 import threading
 import time
+from collections import deque
 from core import GazeTracking
 from safety_monitor import SafetyMonitor
 from data_logger import DataLogger
@@ -46,6 +47,13 @@ class GazeTrackingGUI:
         
         # GUI update
         self.update_thread = None
+        
+        # Diameter graph data (3-second window at ~30 FPS = ~90 data points)
+        self.diameter_window_seconds = 3.0
+        self.left_diameter_data = deque(maxlen=300)  # Store (timestamp, diameter) tuples
+        self.right_diameter_data = deque(maxlen=300)
+        self.last_left_diameter = None  # Last open diameter
+        self.last_right_diameter = None
         
         # Create GUI
         self._create_widgets()
@@ -103,8 +111,7 @@ class GazeTrackingGUI:
         
         # Metrics frame
         metrics_frame = ttk.LabelFrame(right_panel, text="Metrics", padding="10")
-        metrics_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
-        right_panel.rowconfigure(1, weight=1)
+        metrics_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=5)
         metrics_frame.columnconfigure(1, weight=1)
         
         # Create metrics labels
@@ -113,13 +120,10 @@ class GazeTrackingGUI:
             ("FPS:", "fps"),
             ("Latency (ms):", "latency"),
             ("Distance (in):", "distance"),
-            ("Pupil Diameter (px):", "pupil_diameter"),
             ("Left Eye Center:", "left_eye_center"),
             ("Right Eye Center:", "right_eye_center"),
-            ("Gaze Angle H:", "gaze_h"),
-            ("Gaze Angle V:", "gaze_v"),
-            ("Eye State:", "eye_state"),
-            ("Drowsiness Score:", "drowsiness"),
+            ("Left Eye State:", "left_eye_state"),
+            ("Right Eye State:", "right_eye_state"),
             ("Face Detected:", "face_detected"),
         ]
         
@@ -128,6 +132,34 @@ class GazeTrackingGUI:
             value_label = ttk.Label(metrics_frame, text="N/A", foreground="blue")
             value_label.grid(row=i, column=1, sticky=tk.W, padx=10)
             self.metrics_labels[key] = value_label
+        
+        # Diameter graphs frame
+        graphs_frame = ttk.LabelFrame(right_panel, text="Pupil Diameter Graphs", padding="5")
+        graphs_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
+        right_panel.rowconfigure(1, weight=2)  # Give graphs more space
+        graphs_frame.columnconfigure(0, weight=1)
+        graphs_frame.rowconfigure(0, weight=1)
+        graphs_frame.rowconfigure(1, weight=1)
+        
+        # Left eye diameter graph
+        left_graph_frame = ttk.Frame(graphs_frame)
+        left_graph_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=2)
+        left_graph_frame.columnconfigure(0, weight=1)
+        left_graph_frame.rowconfigure(0, weight=1)
+        
+        ttk.Label(left_graph_frame, text="Left Eye", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky=tk.W)
+        self.left_graph_canvas = tk.Canvas(left_graph_frame, width=300, height=150, bg="white", highlightthickness=1)
+        self.left_graph_canvas.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Right eye diameter graph
+        right_graph_frame = ttk.Frame(graphs_frame)
+        right_graph_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=2)
+        right_graph_frame.columnconfigure(0, weight=1)
+        right_graph_frame.rowconfigure(0, weight=1)
+        
+        ttk.Label(right_graph_frame, text="Right Eye", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky=tk.W)
+        self.right_graph_canvas = tk.Canvas(right_graph_frame, width=300, height=150, bg="white", highlightthickness=1)
+        self.right_graph_canvas.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # Status frame
         status_frame = ttk.LabelFrame(right_panel, text="Status", padding="10")
@@ -150,6 +182,8 @@ class GazeTrackingGUI:
             self.safety_monitor = SafetyMonitor(
                 out_of_frame_threshold=config.OUT_OF_FRAME_THRESHOLD,
                 perclos_threshold=config.PERCLOS_THRESHOLD,
+                sustained_seconds=getattr(config, 'DROWSINESS_SUSTAINED_SECONDS', 3.0),
+                alarm_cooldown=getattr(config, 'DROWSINESS_ALARM_COOLDOWN', 10.0),
                 enable_audio=config.ENABLE_AUDIO_ALARMS,
                 enable_visual=config.ENABLE_VISUAL_ALARMS
             )
@@ -256,6 +290,11 @@ class GazeTrackingGUI:
     def _update_loop(self):
         """Main update loop for video processing"""
         while self.is_running:
+            # Safety check: ensure all components are initialized
+            if self.performance_monitor is None or self.gaze is None:
+                time.sleep(0.1)
+                continue
+            
             frame_start = self.performance_monitor.start_frame()
             
             ret, frame = self.cap.read()
@@ -274,34 +313,62 @@ class GazeTrackingGUI:
             
             # Update safety monitor
             eye_state = self.gaze.eye_state()
-            self.safety_monitor.update(
-                self.gaze.is_face_detected(),
-                eye_state,
-                time.time()
-            )
+            if self.safety_monitor is not None:
+                self.safety_monitor.update(
+                    self.gaze.is_face_detected(),
+                    eye_state,
+                    time.time()
+                )
             
             # Log data if recording
-            if self.is_recording:
+            if self.is_recording and self.data_logger is not None:
+                drowsiness_score = 0.0
+                if self.safety_monitor is not None:
+                    drowsiness_score = self.safety_monitor.drowsiness_monitor.get_drowsiness_score()
+                
                 self.data_logger.log(
                     tracker_method=self.gaze.tracker_type,
                     left_pupil_coords=self.gaze.pupil_left_coords(),
                     right_pupil_coords=self.gaze.pupil_right_coords(),
                     left_pupil_diameter=self.gaze.pupil_left_diameter(),
                     right_pupil_diameter=self.gaze.pupil_right_diameter(),
-                    gaze_angle=self.gaze.gaze_angle(),
                     eye_state=eye_state,
-                    drowsiness_score=self.safety_monitor.drowsiness_monitor.get_drowsiness_score(),
+                    drowsiness_score=drowsiness_score,
                     fps=self.performance_monitor.get_fps(),
                     face_detected=self.gaze.is_face_detected(),
                     processing_latency_ms=self.performance_monitor.get_latency_ms()
                 )
             
+            # Update diameter data for graphs
+            current_time = time.time()
+            left_diameter = self.gaze.pupil_left_diameter()
+            right_diameter = self.gaze.pupil_right_diameter()
+            left_eye_open = self.gaze.left_eye_state() == 1
+            right_eye_open = self.gaze.right_eye_state() == 1
+            
+            # Left eye: use actual diameter if open, otherwise use last open diameter
+            if left_eye_open and left_diameter is not None:
+                self.last_left_diameter = left_diameter
+                self.left_diameter_data.append((current_time, left_diameter))
+            elif self.last_left_diameter is not None:
+                # Eye closed, use last open diameter
+                self.left_diameter_data.append((current_time, self.last_left_diameter))
+            
+            # Right eye: use actual diameter if open, otherwise use last open diameter
+            if right_eye_open and right_diameter is not None:
+                self.last_right_diameter = right_diameter
+                self.right_diameter_data.append((current_time, right_diameter))
+            elif self.last_right_diameter is not None:
+                # Eye closed, use last open diameter
+                self.right_diameter_data.append((current_time, self.last_right_diameter))
+            
             # Update GUI (throttled)
             if config.GUI_UPDATE_RATE > 0:
                 time.sleep(1.0 / config.GUI_UPDATE_RATE)
             
-            # Schedule GUI update on main thread
-            self.root.after(0, self._update_gui, frame)
+            # Schedule GUI update on main thread (only if components are initialized)
+            if self.performance_monitor is not None:
+                self.root.after(0, self._update_gui, frame)
     
     def _update_gui(self, frame):
         """Update GUI elements"""
@@ -334,11 +401,6 @@ class GazeTrackingGUI:
             self.metrics_labels["distance"].config(
                 text=f"{distance:.1f}" if distance else "N/A"
             )
-            diameter = self.gaze.pupil_diameter()
-            self.metrics_labels["pupil_diameter"].config(
-                text=f"{diameter:.1f}" if diameter else "N/A"
-            )
-            
             # Eye center coordinates
             left_eye_center = self.gaze.eye_left_center()
             if left_eye_center:
@@ -356,24 +418,122 @@ class GazeTrackingGUI:
             else:
                 self.metrics_labels["right_eye_center"].config(text="N/A")
             
-            gaze_angle = self.gaze.gaze_angle()
-            if gaze_angle:
-                self.metrics_labels["gaze_h"].config(text=f"{gaze_angle[0]:.1f}°")
-                self.metrics_labels["gaze_v"].config(text=f"{gaze_angle[1]:.1f}°")
-            else:
-                self.metrics_labels["gaze_h"].config(text="N/A")
-                self.metrics_labels["gaze_v"].config(text="N/A")
+            # Individual eye states
+            left_eye_state = "Open" if self.gaze.left_eye_state() == 1 else "Closed"
+            right_eye_state = "Open" if self.gaze.right_eye_state() == 1 else "Closed"
+            self.metrics_labels["left_eye_state"].config(text=left_eye_state)
+            self.metrics_labels["right_eye_state"].config(text=right_eye_state)
             
-            eye_state = "Open" if self.gaze.eye_state() == 1 else "Closed"
-            self.metrics_labels["eye_state"].config(text=eye_state)
-            
-            drowsiness = self.safety_monitor.drowsiness_monitor.get_drowsiness_score()
-            self.metrics_labels["drowsiness"].config(text=f"{drowsiness:.2f}")
+            # Update diameter graphs
+            self._update_diameter_graphs()
             
             face_detected = "Yes" if self.gaze.is_face_detected() else "No"
             self.metrics_labels["face_detected"].config(text=face_detected)
         
         # Update alarms with different colors and messages
+    
+    def _update_diameter_graphs(self):
+        """Update the pupil diameter graphs"""
+        current_time = time.time()
+        window_start = current_time - self.diameter_window_seconds
+        
+        # Update left eye graph
+        self._draw_graph(self.left_graph_canvas, self.left_diameter_data, window_start, current_time, "Left Eye")
+        
+        # Update right eye graph
+        self._draw_graph(self.right_graph_canvas, self.right_diameter_data, window_start, current_time, "Right Eye")
+    
+    def _draw_graph(self, canvas, data, window_start, current_time, title):
+        """Draw a diameter graph on the canvas"""
+        canvas.delete("all")
+        
+        width = canvas.winfo_width()
+        height = canvas.winfo_height()
+        
+        if width <= 1 or height <= 1:
+            return  # Canvas not yet sized
+        
+        # Filter data to window
+        window_data = [(t, d) for t, d in data if t >= window_start]
+        
+        if not window_data:
+            # No data, draw empty graph
+            self._draw_empty_graph(canvas, width, height, title)
+            return
+        
+        # Calculate min/max diameter for Y-axis scaling
+        diameters = [d for _, d in window_data]
+        min_diameter = min(diameters) if diameters else 0
+        max_diameter = max(diameters) if diameters else 50
+        
+        # Add padding
+        range_diameter = max_diameter - min_diameter
+        if range_diameter < 10:
+            range_diameter = 10
+        y_min = max(0, min_diameter - range_diameter * 0.1)
+        y_max = max_diameter + range_diameter * 0.1
+        
+        # Draw axes (black)
+        margin = 40
+        graph_width = width - 2 * margin
+        graph_height = height - 2 * margin
+        
+        # X-axis (time)
+        canvas.create_line(margin, height - margin, width - margin, height - margin, fill="black", width=2)
+        # Y-axis (diameter)
+        canvas.create_line(margin, margin, margin, height - margin, fill="black", width=2)
+        
+        # Draw axis labels
+        canvas.create_text(margin // 2, height // 2, text="Diameter (px)", angle=90, fill="black", font=("Arial", 9))
+        canvas.create_text(width // 2, height - margin // 2, text="Time (s)", fill="black", font=("Arial", 9))
+        
+        # Draw Y-axis scale
+        num_ticks = 5
+        for i in range(num_ticks + 1):
+            y_val = y_min + (y_max - y_min) * (1 - i / num_ticks)
+            y_pos = margin + graph_height * (i / num_ticks)
+            canvas.create_line(margin - 5, y_pos, margin, y_pos, fill="black", width=1)
+            canvas.create_text(margin - 10, y_pos, text=f"{y_val:.1f}", fill="black", font=("Arial", 8), anchor="e")
+        
+        # Draw X-axis scale (time)
+        time_range = current_time - window_start
+        for i in range(4):
+            t_val = window_start + time_range * (i / 3)
+            x_pos = margin + graph_width * (i / 3)
+            canvas.create_line(x_pos, height - margin, x_pos, height - margin + 5, fill="black", width=1)
+            time_label = f"{time_range * (1 - i / 3):.1f}s"
+            canvas.create_text(x_pos, height - margin + 15, text=time_label, fill="black", font=("Arial", 8))
+        
+        # Draw data line (red)
+        if len(window_data) > 1:
+            points = []
+            for t, d in window_data:
+                x = margin + graph_width * ((t - window_start) / time_range)
+                y = margin + graph_height * (1 - (d - y_min) / (y_max - y_min))
+                points.append((x, y))
+            
+            # Draw line connecting points
+            for i in range(len(points) - 1):
+                canvas.create_line(points[i][0], points[i][1], points[i+1][0], points[i+1][1], 
+                                 fill="red", width=2)
+    
+    def _draw_empty_graph(self, canvas, width, height, title):
+        """Draw an empty graph with axes"""
+        margin = 40
+        graph_width = width - 2 * margin
+        graph_height = height - 2 * margin
+        
+        # X-axis
+        canvas.create_line(margin, height - margin, width - margin, height - margin, fill="black", width=2)
+        # Y-axis
+        canvas.create_line(margin, margin, margin, height - margin, fill="black", width=2)
+        
+        # Labels
+        canvas.create_text(margin // 2, height // 2, text="Diameter (px)", angle=90, fill="black", font=("Arial", 9))
+        canvas.create_text(width // 2, height - margin // 2, text="Time (s)", fill="black", font=("Arial", 9))
+        
+        # No data message
+        canvas.create_text(width // 2, height // 2, text="No data", fill="gray", font=("Arial", 12))
         status = self.safety_monitor.get_status()
         if status['out_of_frame_alarm']:
             self.alarm_label.config(text="⚠️ OUT OF FRAME - Participant not visible!", foreground="orange")

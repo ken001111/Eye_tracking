@@ -115,9 +115,10 @@ class BaseTracker(ABC):
         x, y, w, h = face_bbox
         
         # Improved eye region estimation based on face geometry
-        # Eyes are typically in the upper 1/3 to 1/2 of the face
-        eye_height = max(20, int(h * 0.2))  # Minimum 20 pixels
-        eye_y = y + int(h * 0.25)  # Start at 25% from top
+        # Eyes are typically in the upper 1/3 to 1/2 of the face, but we want to avoid eyebrow
+        # Start lower to exclude eyebrow area
+        eye_height = max(20, int(h * 0.25))  # 25% of face height for eye region
+        eye_y = y + int(h * 0.35)  # Start at 35% from top (lower to avoid eyebrow)
         eye_width = max(30, int(w * 0.25))  # Minimum 30 pixels, 25% of face width
         
         if eye_side == 'left':
@@ -168,7 +169,7 @@ class BaseTracker(ABC):
     
     def calculate_eye_aspect_ratio(self, eye_frame: np.ndarray) -> float:
         """
-        Calculate Eye Aspect Ratio (EAR) for blink detection.
+        Calculate Eye Aspect Ratio (EAR) for blink detection using improved method.
         Higher EAR indicates open eye, lower indicates closed.
         
         Args:
@@ -177,18 +178,48 @@ class BaseTracker(ABC):
         Returns:
             EAR value (typically 0.2-0.4 for open, <0.2 for closed)
         """
-        h, w = eye_frame.shape[:2]
-        
-        # Approximate vertical and horizontal measurements
-        # This is a simplified version - can be improved with landmarks
-        vertical_1 = h * 0.3
-        vertical_2 = h * 0.7
-        horizontal = w
-        
-        if horizontal == 0:
+        if eye_frame is None or eye_frame.size == 0:
             return 0.0
         
-        ear = (vertical_1 + vertical_2) / (2.0 * horizontal)
+        h, w = eye_frame.shape[:2]
+        if w == 0 or h == 0:
+            return 0.0
+        
+        # Improved method: Use horizontal projection to find actual eye opening
+        # Closed eyes have less variation in the middle region
+        horizontal_projection = np.sum(eye_frame, axis=1)
+        
+        if len(horizontal_projection) == 0:
+            return 0.0
+        
+        # Find the region with maximum variation (where eye opens)
+        mid_h = h // 2
+        top_region = horizontal_projection[:mid_h] if mid_h > 0 else horizontal_projection
+        bottom_region = horizontal_projection[mid_h:] if mid_h < len(horizontal_projection) else horizontal_projection
+        
+        if len(top_region) == 0 or len(bottom_region) == 0:
+            # Fallback to simple method
+            return h / (2.0 * w) if w > 0 else 0.0
+        
+        # Calculate vertical distance (eye opening)
+        # For open eyes, there's more variation between top and bottom
+        top_mean = np.mean(top_region)
+        bottom_mean = np.mean(bottom_region)
+        vertical_variation = abs(top_mean - bottom_mean) / (np.mean(horizontal_projection) + 1e-6)
+        
+        # Horizontal distance is the width
+        horizontal_dist = w
+        
+        if horizontal_dist == 0:
+            return 0.0
+        
+        # Improved EAR: accounts for actual eye opening variation
+        ear = vertical_variation * h / (2.0 * horizontal_dist)
+        
+        # Normalize based on typical eye aspect ratio
+        # Typical eyes are about 2-3x wider than they are tall when open
+        ear = ear * (h / max(w, 1))
+        
         return ear
     
     def is_face_in_frame(self, frame: np.ndarray) -> bool:

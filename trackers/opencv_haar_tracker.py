@@ -292,11 +292,24 @@ class OpenCVHaarTracker(BaseTracker):
         else:
             area_ratio = 0
         
-        # Combined threshold: EAR and area ratio
-        ear_threshold = 0.2
-        area_threshold = 0.1
+        # Use configurable thresholds
+        try:
+            import config
+            ear_threshold = getattr(config, 'EAR_THRESHOLD', 0.25)
+            ear_threshold_closed = getattr(config, 'EAR_THRESHOLD_CLOSED', 0.20)
+            contour_threshold = getattr(config, 'CONTOUR_AREA_THRESHOLD', 0.08)
+        except ImportError:
+            ear_threshold = 0.25
+            ear_threshold_closed = 0.20
+            contour_threshold = 0.08
         
-        is_open = (ear > ear_threshold) and (area_ratio > area_threshold)
+        # Combined threshold: EAR and area ratio
+        # Both conditions must be met for open eye
+        is_open = (ear > ear_threshold) and (area_ratio > contour_threshold)
+        
+        # If EAR is very low, definitely closed
+        if ear < ear_threshold_closed:
+            return 0
         
         return 1 if is_open else 0
     

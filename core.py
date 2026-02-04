@@ -17,7 +17,7 @@ class GazeTracking(object):
     This class tracks the user's gaze using modular tracker backends.
     It provides useful information like the position of the eyes
     and pupils and allows to know if the eyes are open or closed.
-    Enhanced with pupil diameter, gaze angle, and face detection.
+    Enhanced with pupil diameter and face detection.
     """
 
     def __init__(self, tracker_type='dnn', tracker=None):
@@ -206,96 +206,187 @@ class GazeTracking(object):
             return right_d
         return None
 
-    def horizontal_ratio(self):
-        """Returns a number between 0.0 and 1.0 that indicates the
-        horizontal direction of the gaze. The extreme right is 0.0,
-        the center is 0.5 and the extreme left is 1.0
-        """
-        if self.pupils_located:
-            try:
-                pupil_left = self.eye_left.pupil.x / (self.eye_left.center[0] * 2 - 10)
-                pupil_right = self.eye_right.pupil.x / (self.eye_right.center[0] * 2 - 10)
-                return (pupil_left + pupil_right) / 2
-            except (ZeroDivisionError, TypeError):
-                return None
-        return None
 
-    def vertical_ratio(self):
-        """Returns a number between 0.0 and 1.0 that indicates the
-        vertical direction of the gaze. The extreme top is 0.0,
-        the center is 0.5 and the extreme bottom is 1.0
+    def _get_eye_region_frame(self, eye_obj):
+        """Extract eye region frame from Eye object for tracker analysis"""
+        if eye_obj is None or eye_obj.frame is None:
+            return None
+        return eye_obj.frame
+    
+    def _detect_eye_state_advanced(self, eye_frame):
         """
-        if self.pupils_located:
-            try:
-                pupil_left = self.eye_left.pupil.y / (self.eye_left.center[1] * 2 - 10)
-                pupil_right = self.eye_right.pupil.y / (self.eye_right.center[1] * 2 - 10)
-                return (pupil_left + pupil_right) / 2
-            except (ZeroDivisionError, TypeError):
-                return None
-        return None
-
-    def gaze_angle(self):
-        """
-        Calculate gaze angle in degrees.
+        Advanced eye state detection using multiple methods.
+        Assumes eye is OPEN unless proven closed (conservative approach).
         
+        Args:
+            eye_frame: Grayscale eye region
+            
         Returns:
-            Tuple of (horizontal_angle, vertical_angle) in degrees, or None
+            1 for open, 0 for closed
         """
-        h_ratio = self.horizontal_ratio()
-        v_ratio = self.vertical_ratio()
+        if eye_frame is None or eye_frame.size == 0:
+            return 1  # Assume open if no frame
         
-        if h_ratio is None or v_ratio is None:
+        import config
+        
+        # Method 1: Use tracker's get_eye_state (only if enabled)
+        if config.USE_TRACKER_EYE_STATE:
+            try:
+                tracker_state = self.tracker.get_eye_state(eye_frame)
+                if tracker_state is not None:
+                    # Only trust tracker if it says closed (be very conservative)
+                    if tracker_state == 0:
+                        # Double-check with EAR before declaring closed
+                        ear = self._calculate_improved_ear(eye_frame)
+                        if ear is not None and ear < config.EAR_THRESHOLD_CLOSED:
+                            return 0
+                    # If tracker says open, trust it
+                    return tracker_state
+            except Exception:
+                pass
+        
+        # Method 2: Improved EAR calculation (primary method)
+        ear = self._calculate_improved_ear(eye_frame)
+        if ear is not None:
+            # Extremely conservative: only declare closed if EAR is extremely low
+            # Most eyes will have EAR > 0.02, so this should rarely trigger false closes
+            if ear < config.EAR_THRESHOLD_CLOSED:
+                return 0  # Definitely closed (only if EAR is extremely low)
+            # Otherwise always assume open (very permissive)
+            return 1
+        
+        # Method 3: Histogram analysis (only if multi-method enabled)
+        if config.USE_MULTI_METHOD_DETECTION:
+            hist_variance = np.var(eye_frame)
+            hist_max = np.max(eye_frame)
+            if hist_max > 0:
+                hist_normalized = hist_variance / (hist_max + 1e-6)
+                
+                # Only use histogram if it strongly suggests closed AND EAR confirms
+                if hist_normalized < config.HISTOGRAM_THRESHOLD:
+                    if ear is not None and ear < config.EAR_THRESHOLD_CLOSED:
+                        return 0
+        
+        # Method 4: Contour analysis (only if multi-method enabled)
+        if config.USE_MULTI_METHOD_DETECTION:
+            try:
+                _, thresh = cv2.threshold(eye_frame, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                
+                if contours:
+                    total_area = sum(cv2.contourArea(c) for c in contours)
+                    frame_area = eye_frame.shape[0] * eye_frame.shape[1]
+                    area_ratio = total_area / frame_area if frame_area > 0 else 0
+                    
+                    # Only use contour if it strongly suggests closed AND EAR confirms
+                    if area_ratio < config.CONTOUR_AREA_THRESHOLD:
+                        if ear is not None and ear < config.EAR_THRESHOLD_CLOSED:
+                            return 0
+            except Exception:
+                pass
+        
+        # Default: assume open (conservative - only declare closed with strong evidence)
+        return 1
+    
+    def _calculate_improved_ear(self, eye_frame):
+        """
+        Improved EAR calculation using better image processing.
+        
+        Args:
+            eye_frame: Grayscale eye region
+            
+        Returns:
+            EAR value or None
+        """
+        if eye_frame is None or eye_frame.size == 0:
             return None
         
-        # Convert ratios to angles (approximate, can be calibrated)
-        # Assuming ±30 degrees horizontal and ±20 degrees vertical range
-        horizontal_angle = (h_ratio - 0.5) * 60.0  # -30 to +30 degrees
-        vertical_angle = (v_ratio - 0.5) * 40.0  # -20 to +20 degrees
+        h, w = eye_frame.shape[:2]
+        if w == 0 or h == 0:
+            return None
         
-        return (horizontal_angle, vertical_angle)
-
-    def is_right(self):
-        """Returns true if the user is looking to the right"""
-        if self.pupils_located:
-            ratio = self.horizontal_ratio()
-            if ratio is not None:
-                return ratio <= 0.35
-        return False
-
-    def is_left(self):
-        """Returns true if the user is looking to the left"""
-        if self.pupils_located:
-            ratio = self.horizontal_ratio()
-            if ratio is not None:
-                return ratio >= 0.65
-        return False
-
-    def is_center(self):
-        """Returns true if the user is looking to the center"""
-        if self.pupils_located:
-            return self.is_right() is not True and self.is_left() is not True
-        return False
-
+        # Use horizontal projection to find eye opening
+        # Closed eyes have less variation in the middle horizontal region
+        horizontal_projection = np.sum(eye_frame, axis=1)
+        
+        # Find the region with maximum variation (where eye opens)
+        # For open eyes, there should be a clear valley in the middle
+        mid_h = h // 2
+        top_region = horizontal_projection[:mid_h]
+        bottom_region = horizontal_projection[mid_h:]
+        
+        if len(top_region) == 0 or len(bottom_region) == 0:
+            return None
+        
+        # Calculate vertical distance (eye opening)
+        top_max = np.max(top_region)
+        bottom_max = np.max(bottom_region)
+        vertical_dist = abs(top_max - bottom_max) / (np.mean(horizontal_projection) + 1e-6)
+        
+        # Horizontal distance is the width
+        horizontal_dist = w
+        
+        if horizontal_dist == 0:
+            return None
+        
+        # Improved EAR: accounts for actual eye opening
+        ear = vertical_dist / (2.0 * horizontal_dist)
+        
+        # Normalize based on frame size
+        ear = ear * (h / w)  # Adjust for aspect ratio
+        
+        return ear
+    
+    def left_eye_state(self):
+        """
+        Get left eye state independently.
+        Very permissive - defaults to open unless strongly proven closed.
+        
+        Returns:
+            1 for open, 0 for closed
+        """
+        # If pupil is detected, eye is almost certainly open
+        if self.pupils_located and self.eye_left is not None and self.eye_left.pupil is not None:
+            if self.eye_left.pupil.x is not None and self.eye_left.pupil.y is not None:
+                return 1  # Pupil detected = eye is open
+        
+        left_frame = self._get_eye_region_frame(self.eye_left)
+        if left_frame is not None:
+            return self._detect_eye_state_advanced(left_frame)
+        
+        # Default to open (very permissive)
+        return 1
+    
+    def right_eye_state(self):
+        """
+        Get right eye state independently.
+        Very permissive - defaults to open unless strongly proven closed.
+        
+        Returns:
+            1 for open, 0 for closed
+        """
+        # If pupil is detected, eye is almost certainly open
+        if self.pupils_located and self.eye_right is not None and self.eye_right.pupil is not None:
+            if self.eye_right.pupil.x is not None and self.eye_right.pupil.y is not None:
+                return 1  # Pupil detected = eye is open
+        
+        right_frame = self._get_eye_region_frame(self.eye_right)
+        if right_frame is not None:
+            return self._detect_eye_state_advanced(right_frame)
+        
+        # Default to open (very permissive)
+        return 1
+    
     def is_blinking(self):
-        """Returns true if the user closes his eyes (binary classification)"""
-        if not self.pupils_located:
-            return True  # If pupils not located, assume eyes are closed
+        """
+        Returns true if the user closes his eyes (binary classification).
+        Eye is considered closed if EITHER eye is closed (more sensitive).
+        """
+        left_state = self.left_eye_state()
+        right_state = self.right_eye_state()
         
-        try:
-            # Use EAR (Eye Aspect Ratio) if available
-            if self.eye_left.ear is not None and self.eye_right.ear is not None:
-                avg_ear = (self.eye_left.ear + self.eye_right.ear) / 2.0
-                # EAR threshold: <0.2 typically indicates closed
-                return avg_ear < 0.2
-            else:
-                # Fallback to blinking ratio
-                if self.eye_left.blinking is not None and self.eye_right.blinking is not None:
-                    blinking_ratio = (self.eye_left.blinking + self.eye_right.blinking) / 2
-                    return blinking_ratio > 3.8
-        except (AttributeError, TypeError):
-            pass
-        
-        return False
+        # Eye is closed if EITHER eye is closed (more sensitive and accurate)
+        return (left_state == 0) or (right_state == 0)
 
     def eye_state(self):
         """
@@ -329,45 +420,26 @@ class GazeTracking(object):
         if frame is None:
             return None
 
-        # Draw face bounding box
-        if self.face_detected and self.face_bbox is not None:
-            x, y, w, h = self.face_bbox
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
-
-        # Draw eye regions
+        # Draw eye center dots (yellow)
         if self.eye_left is not None and self.eye_left.origin is not None:
-            eye_x, eye_y = self.eye_left.origin
-            eye_w = self.eye_left.frame.shape[1] if self.eye_left.frame is not None else 50
-            eye_h = self.eye_left.frame.shape[0] if self.eye_left.frame is not None else 30
-            cv2.rectangle(frame, (eye_x, eye_y), (eye_x + eye_w, eye_y + eye_h), (255, 255, 0), 1)
-            
-            # Draw eye center
             center = self.eye_left_center()
             if center:
                 cv2.circle(frame, center, 3, (255, 255, 0), -1)
         
         if self.eye_right is not None and self.eye_right.origin is not None:
-            eye_x, eye_y = self.eye_right.origin
-            eye_w = self.eye_right.frame.shape[1] if self.eye_right.frame is not None else 50
-            eye_h = self.eye_right.frame.shape[0] if self.eye_right.frame is not None else 30
-            cv2.rectangle(frame, (eye_x, eye_y), (eye_x + eye_w, eye_y + eye_h), (255, 255, 0), 1)
-            
-            # Draw eye center
             center = self.eye_right_center()
             if center:
                 cv2.circle(frame, center, 3, (255, 255, 0), -1)
 
-        # Draw pupils in green
+        # Draw pupils in green (only circles, no rectangles)
         if self.pupils_located:
             color = (0, 255, 0)  # Green in BGR
             x_left, y_left = self.pupil_left_coords()
             x_right, y_right = self.pupil_right_coords()
             
-            if x_left is not None and y_left is not None:
-                # Draw crosshair
-                cv2.line(frame, (x_left - 5, y_left), (x_left + 5, y_left), color, 2)
-                cv2.line(frame, (x_left, y_left - 5), (x_left, y_left + 5), color, 2)
-                # Draw circle for pupil
+            # Only draw pupils if eyes are open - just circles, no crosshairs
+            if x_left is not None and y_left is not None and self.left_eye_state() == 1:
+                # Draw circle for pupil only
                 if self.eye_left.pupil.diameter is not None and self.eye_left.pupil.diameter > 0:
                     radius = max(3, int(self.eye_left.pupil.diameter / 2))
                     cv2.circle(frame, (x_left, y_left), radius, color, 2)
@@ -375,11 +447,8 @@ class GazeTracking(object):
                     # Default circle if diameter not available
                     cv2.circle(frame, (x_left, y_left), 5, color, 2)
             
-            if x_right is not None and y_right is not None:
-                # Draw crosshair
-                cv2.line(frame, (x_right - 5, y_right), (x_right + 5, y_right), color, 2)
-                cv2.line(frame, (x_right, y_right - 5), (x_right, y_right + 5), color, 2)
-                # Draw circle for pupil
+            if x_right is not None and y_right is not None and self.right_eye_state() == 1:
+                # Draw circle for pupil only
                 if self.eye_right.pupil.diameter is not None and self.eye_right.pupil.diameter > 0:
                     radius = max(3, int(self.eye_right.pupil.diameter / 2))
                     cv2.circle(frame, (x_right, y_right), radius, color, 2)

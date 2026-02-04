@@ -6,7 +6,7 @@ A modular, real-time eye tracking system using OpenCV with support for multiple 
 
 - **Multiple Tracking Methods**: Support for OpenCV DNN (ML), Haar Cascade (non-ML), and Hybrid approaches
 - **Real-time Performance**: Target 100Hz processing (minimum 50Hz)
-- **Advanced Metrics**: Pupil diameter, gaze angle, eye state classification
+- **Advanced Metrics**: Pupil diameter, eye state classification (independent per eye)
 - **Safety Monitoring**: Out-of-frame detection and drowsiness monitoring with alarms
 - **Data Export**: CSV export with high-precision timestamps for correlation with other data
 - **GUI Application**: User-friendly interface with real-time visualization
@@ -74,9 +74,10 @@ while True:
     # Get metrics
     left_pupil = gaze.pupil_left_coords()
     right_pupil = gaze.pupil_right_coords()
-    diameter = gaze.pupil_diameter()
-    gaze_angle = gaze.gaze_angle()
-    eye_state = gaze.eye_state()  # 1 = open, 0 = closed
+    left_diameter = gaze.pupil_left_diameter()
+    right_diameter = gaze.pupil_right_diameter()
+    left_eye_state = gaze.left_eye_state()  # 1 = open, 0 = closed
+    right_eye_state = gaze.right_eye_state()  # 1 = open, 0 = closed
     
     # Display annotated frame
     annotated = gaze.annotated_frame()
@@ -151,13 +152,10 @@ GazeTracking(tracker_type='dnn', tracker=None)
 - `pupil_left_diameter()`: Get left pupil diameter in pixels
 - `pupil_right_diameter()`: Get right pupil diameter in pixels
 - `pupil_diameter()`: Get average pupil diameter
-- `gaze_angle()`: Get gaze angle (horizontal, vertical) in degrees
-- `horizontal_ratio()`: Get horizontal gaze ratio (0.0-1.0)
-- `vertical_ratio()`: Get vertical gaze ratio (0.0-1.0)
-- `eye_state()`: Get eye state (1 = open, 0 = closed)
+- `left_eye_state()`, `right_eye_state()`: Get individual eye state (1 = open, 0 = closed)
+- `eye_state()`: Get combined eye state (1 = open, 0 = closed)
 - `is_blinking()`: Check if eyes are closed
 - `is_face_detected()`: Check if face is detected
-- `is_left()`, `is_right()`, `is_center()`: Gaze direction
 - `annotated_frame()`: Get frame with annotations
 - `switch_tracker(tracker_type)`: Switch tracker method
 
@@ -170,7 +168,7 @@ CSV files contain the following columns:
 - `left_pupil_x`, `left_pupil_y`: Left pupil coordinates
 - `right_pupil_x`, `right_pupil_y`: Right pupil coordinates
 - `left_pupil_diameter`, `right_pupil_diameter`: Pupil diameters in pixels
-- `gaze_angle_horizontal`, `gaze_angle_vertical`: Gaze angles in degrees
+- `left_eye_state`, `right_eye_state`: Individual eye state (1 = open, 0 = closed)
 - `eye_state`: 1 for open, 0 for closed
 - `drowsiness_score`: Drowsiness score (0.0-1.0)
 - `fps`: Current FPS

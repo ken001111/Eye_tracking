@@ -100,7 +100,7 @@ kf = KalmanFilter(dim_x=2, dim_z=2)
 # Update with each new detection
 ```
 
-## 5. Gaze Angle Calibration
+## 5. Pupil Diameter Calibration
 
 ### Screen-Based Calibration
 Implement a calibration routine that maps pupil positions to screen coordinates:
@@ -113,7 +113,7 @@ Implement a calibration routine that maps pupil positions to screen coordinates:
 ### Distance Calibration
 Calibrate for different distances:
 - Measure actual distance
-- Adjust gaze angle calculations based on distance
+- Adjust pupil diameter measurements based on distance and lighting
 - Store calibration parameters per user
 
 ## 6. Hardware Improvements
@@ -162,9 +162,9 @@ Focus processing on face/eye regions:
 ## 8. Machine Learning Enhancements
 
 ### Train Custom Models
-- Collect labeled data (pupil positions, gaze angles)
+- Collect labeled data (pupil positions, diameters)
 - Train CNN for pupil detection
-- Train regression model for gaze angle prediction
+- Train regression model for diameter prediction
 
 ### Transfer Learning
 - Use pre-trained models (e.g., from gaze estimation datasets)
@@ -186,7 +186,7 @@ In `config.py` and tracker files:
 ### Calibration Parameters
 - `CALIBRATION_FRAMES`: More frames = better calibration
 - `PUPIL_DETECTION_THRESHOLD`: Tune for your lighting
-- `GAZE_ANGLE_HORIZONTAL_RANGE`: Calibrate based on your setup
+- `PUPIL_DETECTION_THRESHOLD`: Calibrate based on your lighting conditions
 
 ## 10. Validation and Testing
 

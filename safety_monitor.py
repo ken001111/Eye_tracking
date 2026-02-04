@@ -66,9 +66,11 @@ class DrowsinessMonitor:
     """
     
     def __init__(self, 
-                 perclos_threshold=0.5,
-                 blink_frequency_threshold=0.1,  # blinks per second
-                 window_size=60,  # frames (assuming ~50-100Hz)
+                 perclos_threshold=0.7,
+                 blink_frequency_threshold=0.05,  # blinks per second
+                 window_size=120,  # frames (assuming ~50-100Hz)
+                 sustained_seconds=3.0,  # Must be drowsy for this long before alarm
+                 alarm_cooldown=10.0,  # Seconds before allowing another alarm
                  alarm_callback=None):
         """
         Initialize drowsiness monitor.
@@ -77,11 +79,15 @@ class DrowsinessMonitor:
             perclos_threshold: PERCLOS threshold (0.0-1.0) to trigger alarm
             blink_frequency_threshold: Minimum blinks per second (too low = drowsy)
             window_size: Number of frames to analyze for PERCLOS
+            sustained_seconds: Must be drowsy for this many seconds before triggering alarm
+            alarm_cooldown: Seconds to wait before allowing another alarm
             alarm_callback: Callback function called when drowsiness detected
         """
         self.perclos_threshold = perclos_threshold
         self.blink_frequency_threshold = blink_frequency_threshold
         self.window_size = window_size
+        self.sustained_seconds = sustained_seconds
+        self.alarm_cooldown = alarm_cooldown
         self.alarm_callback = alarm_callback
         
         # Store eye states in a sliding window
@@ -91,6 +97,8 @@ class DrowsinessMonitor:
         
         self.alarm_active = False
         self.drowsiness_score = 0.0
+        self.drowsiness_start_time = None  # When drowsiness condition first met
+        self.last_alarm_time = None  # When last alarm was triggered
     
     def update(self, eye_state: int, timestamp: Optional[float] = None):
         """
@@ -123,11 +131,38 @@ class DrowsinessMonitor:
             perclos = closed_count / len(self.eye_states)
             self.drowsiness_score = perclos
             
-            # Check for drowsiness
-            if perclos >= self.perclos_threshold and not self.alarm_active:
-                self.alarm_active = True
-                if self.alarm_callback:
-                    self.alarm_callback("drowsiness")
+            # Check for drowsiness with sustained requirement
+            is_drowsy = perclos >= self.perclos_threshold
+            
+            # Check cooldown period
+            if self.last_alarm_time is not None:
+                time_since_alarm = timestamp - self.last_alarm_time
+                if time_since_alarm < self.alarm_cooldown:
+                    # Still in cooldown, don't trigger alarm
+                    if not is_drowsy:
+                        self.drowsiness_start_time = None
+                    return
+            
+            if is_drowsy:
+                # Drowsiness condition met
+                if self.drowsiness_start_time is None:
+                    # Start tracking when drowsiness began
+                    self.drowsiness_start_time = timestamp
+                else:
+                    # Check if drowsiness has been sustained long enough
+                    drowsiness_duration = timestamp - self.drowsiness_start_time
+                    if drowsiness_duration >= self.sustained_seconds and not self.alarm_active:
+                        # Trigger alarm only if sustained for required duration
+                        self.alarm_active = True
+                        self.last_alarm_time = timestamp
+                        if self.alarm_callback:
+                            self.alarm_callback("drowsiness")
+            else:
+                # Not drowsy, reset tracking
+                self.drowsiness_start_time = None
+                if self.alarm_active:
+                    # Reset alarm if condition no longer met
+                    self.alarm_active = False
         else:
             # Not enough data yet, use current state
             if len(self.eye_states) > 0:
@@ -173,6 +208,8 @@ class DrowsinessMonitor:
         self.alarm_active = False
         self.drowsiness_score = 0.0
         self.last_blink_time = None
+        self.drowsiness_start_time = None
+        self.last_alarm_time = None
 
 
 class AlarmSystem:
@@ -288,7 +325,9 @@ class SafetyMonitor:
     
     def __init__(self, 
                  out_of_frame_threshold=5,
-                 perclos_threshold=0.5,
+                 perclos_threshold=0.7,
+                 sustained_seconds=3.0,
+                 alarm_cooldown=10.0,
                  enable_audio=True,
                  enable_visual=True):
         """
@@ -297,6 +336,8 @@ class SafetyMonitor:
         Args:
             out_of_frame_threshold: Frames without face to trigger alarm
             perclos_threshold: PERCLOS threshold for drowsiness
+            sustained_seconds: Must be drowsy for this many seconds before alarm
+            alarm_cooldown: Seconds to wait before allowing another alarm
             enable_audio: Enable audio alarms
             enable_visual: Enable visual alarms
         """
@@ -309,6 +350,8 @@ class SafetyMonitor:
         
         self.drowsiness_monitor = DrowsinessMonitor(
             perclos_threshold=perclos_threshold,
+            sustained_seconds=sustained_seconds,
+            alarm_cooldown=alarm_cooldown,
             alarm_callback=self.alarm_system.trigger_alarm
         )
     

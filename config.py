@@ -17,9 +17,11 @@ DISTANCE_RANGE_INCHES = (20.0, 30.0)  # Valid distance range (min, max)
 
 # Safety Monitor Settings
 OUT_OF_FRAME_THRESHOLD = 5  # Consecutive frames without face to trigger alarm
-PERCLOS_THRESHOLD = 0.5  # PERCLOS threshold for drowsiness (0.0-1.0)
-BLINK_FREQUENCY_THRESHOLD = 0.1  # Minimum blinks per second
-DROWSINESS_WINDOW_SIZE = 60  # Frames to analyze for PERCLOS
+PERCLOS_THRESHOLD = 0.7  # PERCLOS threshold for drowsiness (0.0-1.0) - increased to reduce false alarms
+BLINK_FREQUENCY_THRESHOLD = 0.05  # Minimum blinks per second (reduced threshold)
+DROWSINESS_WINDOW_SIZE = 120  # Frames to analyze for PERCLOS (increased for more stable measurement)
+DROWSINESS_SUSTAINED_SECONDS = 3.0  # Must be drowsy for this many seconds before alarm
+DROWSINESS_ALARM_COOLDOWN = 10.0  # Seconds to wait before allowing another alarm
 
 # Alarm Settings
 ENABLE_AUDIO_ALARMS = True
@@ -42,9 +44,13 @@ CALIBRATION_FRAMES = 20  # Number of frames for calibration
 PUPIL_DETECTION_THRESHOLD = 50  # Default threshold (will be calibrated)
 PUPIL_DIAMETER_METHOD = 'average'  # 'average', 'circle', 'ellipse', 'box'
 
-# Gaze Angle Settings
-GAZE_ANGLE_HORIZONTAL_RANGE = 60.0  # ±30 degrees
-GAZE_ANGLE_VERTICAL_RANGE = 40.0  # ±20 degrees
+# Eye State Detection Settings
+EAR_THRESHOLD = 0.05  # Eye Aspect Ratio threshold for open eye (very low = very permissive)
+EAR_THRESHOLD_CLOSED = 0.02  # Threshold below which eye is definitely closed (extremely low to reduce false positives)
+USE_TRACKER_EYE_STATE = False  # Disable tracker eye state (it's causing false positives)
+USE_MULTI_METHOD_DETECTION = False  # Disable multi-method to reduce false positives (use only EAR)
+HISTOGRAM_THRESHOLD = 0.2  # Histogram variance threshold for closed eye (lower = less sensitive)
+CONTOUR_AREA_THRESHOLD = 0.05  # Minimum contour area ratio for open eye (lower = less sensitive)
 
 # Webcam Settings
 WEBCAM_INDEX = 0  # Default webcam index

@@ -50,8 +50,6 @@ class DataLogger:
             'right_pupil_y',
             'left_pupil_diameter',
             'right_pupil_diameter',
-            'gaze_angle_horizontal',
-            'gaze_angle_vertical',
             'eye_state',
             'drowsiness_score',
             'fps',
@@ -95,7 +93,6 @@ class DataLogger:
             right_pupil_coords: Optional[tuple] = None,
             left_pupil_diameter: Optional[float] = None,
             right_pupil_diameter: Optional[float] = None,
-            gaze_angle: Optional[tuple] = None,
             eye_state: Optional[int] = None,
             drowsiness_score: Optional[float] = None,
             fps: Optional[float] = None,
@@ -111,7 +108,6 @@ class DataLogger:
             right_pupil_coords: (x, y) coordinates of right pupil
             left_pupil_diameter: Diameter of left pupil in pixels
             right_pupil_diameter: Diameter of right pupil in pixels
-            gaze_angle: (horizontal, vertical) gaze angle in degrees
             eye_state: 1 for open, 0 for closed
             drowsiness_score: Drowsiness score (0.0-1.0)
             fps: Current FPS
@@ -128,12 +124,6 @@ class DataLogger:
         # Format timestamp with microsecond precision
         timestamp_str = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S.%f")
         
-        # Extract gaze angles
-        gaze_h = None
-        gaze_v = None
-        if gaze_angle is not None:
-            gaze_h, gaze_v = gaze_angle
-        
         # Extract pupil coordinates
         left_x, left_y = (left_pupil_coords if left_pupil_coords else (None, None))
         right_x, right_y = (right_pupil_coords if right_pupil_coords else (None, None))
@@ -148,8 +138,6 @@ class DataLogger:
             right_y,
             left_pupil_diameter,
             right_pupil_diameter,
-            gaze_h,
-            gaze_v,
             eye_state,
             drowsiness_score,
             fps,
