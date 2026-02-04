@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Data files
+*.csv
+*.dat
+*.pkl
+*.h5
+*.hdf5
+logs/
+exports/
+
+# Model files (too large for git - use Git LFS or download separately)
+trained_models/opencv_dnn/*.caffemodel
+trained_models/opencv_dnn/*.pb
+*.caffemodel
+*.pb
+*.onnx
+*.weights
+
+# Keep model structure but not large files
+!trained_models/opencv_dnn/.gitkeep
+!trained_models/haarcascades/*.xml
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+gaze_tracking_data_*.csv
+*.mp4
+*.avi
