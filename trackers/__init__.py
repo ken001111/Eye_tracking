@@ -3,18 +3,10 @@ Tracker factory and exports for modular eye tracking backends.
 """
 
 from trackers.base_tracker import BaseTracker
-from trackers.opencv_dnn_tracker import OpenCVDNNTracker
-from trackers.opencv_haar_tracker import OpenCVHaarTracker
-from trackers.hybrid_tracker import HybridTracker
 from trackers.mediapipe_tracker import MediaPipeTracker
 
 # Tracker registry
 TRACKER_REGISTRY = {
-    'dnn': OpenCVDNNTracker,
-    'opencv_dnn': OpenCVDNNTracker,
-    'haar': OpenCVHaarTracker,
-    'opencv_haar': OpenCVHaarTracker,
-    'hybrid': HybridTracker,
     'mediapipe': MediaPipeTracker,
 }
 

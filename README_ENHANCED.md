@@ -107,21 +107,8 @@ cv2.destroyAllWindows()
 
 | Method | Type | Accuracy | Speed | Use Case |
 |--------|------|----------|-------|----------|
-| **OpenCV DNN** | ML | High | Medium | Default, best accuracy |
-| **OpenCV Haar** | Non-ML | Medium | Fast | Fast processing, lower accuracy acceptable |
-| **Hybrid** | Combined | High | Medium-Fast | Best balance, fallback support |
+| **MediaPipe** | ML | High | Fast | Default, best accuracy and performance |
 
-### Switching Trackers
-
-You can switch trackers at runtime:
-
-```python
-# Switch to Haar tracker
-gaze.switch_tracker('haar')
-
-# Switch to Hybrid tracker
-gaze.switch_tracker('hybrid')
-```
 
 ## Architecture
 
@@ -133,9 +120,7 @@ The system uses a modular architecture with a base tracker interface:
 gaze_tracking/
 ├── trackers/
 │   ├── base_tracker.py       # Abstract base class
-│   ├── opencv_dnn_tracker.py # ML-based tracker
-│   ├── opencv_haar_tracker.py # Non-ML tracker
-│   └── hybrid_tracker.py     # Combined approach
+│   └── mediapipe_tracker.py  # MediaPipe-based tracker
 ├── gaze_tracking.py          # Main API
 ├── eye.py                    # Eye detection
 ├── pupil.py                  # Pupil detection with diameter

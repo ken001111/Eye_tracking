@@ -22,7 +22,7 @@ def main():
     )
     parser.add_argument(
         '--tracker',
-        choices=['dnn', 'haar', 'hybrid', 'mediapipe'],
+        choices=['mediapipe'],
         default=config.DEFAULT_TRACKER,
         help=f'Tracker method to use (default: {config.DEFAULT_TRACKER})'
     )

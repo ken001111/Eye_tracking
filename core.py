@@ -20,12 +20,12 @@ class GazeTracking(object):
     Enhanced with pupil diameter and face detection.
     """
 
-    def __init__(self, tracker_type='dnn', tracker=None):
+    def __init__(self, tracker_type='mediapipe', tracker=None):
         """
         Initialize GazeTracking.
         
         Args:
-            tracker_type: Type of tracker ('dnn', 'haar', 'hybrid'). Default: 'dnn'
+            tracker_type: Type of tracker ('mediapipe'). Default: 'mediapipe'
             tracker: Optional pre-initialized tracker instance
         """
         self.frame = None
@@ -459,7 +459,7 @@ class GazeTracking(object):
         Switch to a different tracker method.
         
         Args:
-            tracker_type: Type of tracker ('dnn', 'haar', 'hybrid')
+            tracker_type: Type of tracker ('mediapipe')
         """
         self.tracker = create_tracker(tracker_type)
         self.tracker_type = tracker_type
