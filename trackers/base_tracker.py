@@ -76,12 +76,13 @@ class BaseTracker(ABC):
         return None
     
     @abstractmethod
-    def get_eye_state(self, eye_frame: np.ndarray) -> int:
+    def get_eye_state(self, eye_frame: np.ndarray, eye_side: str) -> Optional[int]:
         """
-        Classify eye state as Open (1) or Closed (0).
+        Detect if eye is open or closed.
         
         Args:
-            eye_frame: Grayscale eye region frame
+            eye_frame: Grayscale eye region
+            eye_side: 'left' or 'right'
             
         Returns:
             1 for open, 0 for closed

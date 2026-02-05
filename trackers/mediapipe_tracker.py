@@ -157,16 +157,51 @@ class MediaPipeTracker(BaseTracker):
         # This keeps the behavior consistent with 'nice accuracy' repo which uses dlib + image processing.
         return None 
 
-    def get_eye_state(self, eye_frame: np.ndarray) -> int:
+    def get_eye_state(self, eye_frame: np.ndarray, eye_side: str = 'left') -> Optional[int]:
         """
-        Classify eye state.
-        MediaPipe is very good at this using landmarks vertical distance.
+        Classify eye state using MediaPipe landmarks.
+        Calculates Eye Aspect Ratio (EAR) from landmarks.
         """
-        # Simple EAR-like check could be done here if we stored landmark-based EAR.
-        # For now, let base class handling or core.py handle EAR calculation on the clean image.
-        return 1
+        if self.current_landmarks is None:
+            return None
+            
+        landmarks = self.current_landmarks.landmark
         
-        return super().get_eye_region_coords(face_bbox, eye_side)
+        # Define vertical landmark pairs for EAR calculation
+        # These correspond to top/bottom eyelid points
+        if eye_side == 'left':
+            # Top-Bottom pairs for left eye
+            vertical_pairs = [(159, 145), (158, 153)] 
+            horizontal_pair = (133, 33) # Inner-Outer corners
+        else:
+            # Top-Bottom pairs for right eye
+            vertical_pairs = [(386, 374), (385, 373)]
+            horizontal_pair = (263, 362)
+            
+        # Calculate avg vertical distance
+        v_dist = 0
+        for top, bottom in vertical_pairs:
+            p1 = landmarks[top]
+            p2 = landmarks[bottom]
+            dist = np.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2)
+            v_dist += dist
+        v_dist /= len(vertical_pairs)
+        
+        # Calculate horizontal distance
+        p_left = landmarks[horizontal_pair[0]]
+        p_right = landmarks[horizontal_pair[1]]
+        h_dist = np.sqrt((p_left.x - p_right.x)**2 + (p_left.y - p_right.y)**2)
+        
+        # Calculate EAR
+        if h_dist == 0:
+            return None
+        ear = v_dist / h_dist
+        
+        # Threshold for blink detection
+        # Typical EAR for open eye is > 0.25-0.3, closed is < 0.2
+        EAR_THRESHOLD = 0.22
+        
+        return 1 if ear > EAR_THRESHOLD else 0
 
     def get_pupil_location(self, frame: np.ndarray, face_bbox: Tuple[int, int, int, int], eye_side: str) -> Optional[Tuple[int, int, float]]:
         """
@@ -196,7 +231,13 @@ class MediaPipeTracker(BaseTracker):
         avg_y = sum(p[1] for p in points) / len(points)
         
         # Calculate diameter (average distance from center * 2)
-        radii = [np.sqrt((p[0] - avg_x)**2 + (p[1] - avg_y)**2) for p in points]
-        diameter = sum(radii) / len(radii) * 2.0
+        import config
+        if config.USE_HYBRID_DIAMETER:
+            # Return None for diameter to trigger hybrid calculation in Pupil class
+            diameter = None
+        else:
+            # Use MediaPipe iris diameter
+            radii = [np.sqrt((p[0] - avg_x)**2 + (p[1] - avg_y)**2) for p in points]
+            diameter = sum(radii) / len(radii) * 2.0
         
         return (int(avg_x), int(avg_y), diameter)

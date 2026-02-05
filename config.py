@@ -43,12 +43,13 @@ CALIBRATION_FRAMES = 20  # Number of frames for calibration
 # Pupil Detection Settings
 PUPIL_DETECTION_THRESHOLD = 50  # Default threshold (will be calibrated)
 PUPIL_DIAMETER_METHOD = 'average'  # 'average', 'circle', 'ellipse', 'box'
+USE_HYBRID_DIAMETER = False # Use MediaPipe for location + Image Thresholding for diameter
 
 # Eye State Detection Settings
-EAR_THRESHOLD = 0.05  # Eye Aspect Ratio threshold for open eye (very low = very permissive)
-EAR_THRESHOLD_CLOSED = 0.02  # Threshold below which eye is definitely closed (extremely low to reduce false positives)
-USE_TRACKER_EYE_STATE = False  # Disable tracker eye state (it's causing false positives)
-USE_MULTI_METHOD_DETECTION = False  # Disable multi-method to reduce false positives (use only EAR)
+EAR_THRESHOLD = 0.25  # Eye Aspect Ratio threshold for open eye (Standard: ~0.25-0.30)
+EAR_THRESHOLD_CLOSED = 0.18  # Threshold below which eye is definitely closed (Increased from 0.02 to 0.18)
+USE_TRACKER_EYE_STATE = True # Use tracker's built-in state
+USE_MULTI_METHOD_DETECTION = True  # Enable multi-method to improve accuracy (Histogram/Contour)
 HISTOGRAM_THRESHOLD = 0.2  # Histogram variance threshold for closed eye (lower = less sensitive)
 CONTOUR_AREA_THRESHOLD = 0.05  # Minimum contour area ratio for open eye (lower = less sensitive)
 
@@ -65,3 +66,7 @@ CSV_EXPORT_DIR = "exports"  # Directory for CSV exports
 # Debug Settings
 DEBUG_MODE = False  # Enable debug output
 VERBOSE_LOGGING = False  # Enable verbose logging
+
+# User Preference Settings
+SWAP_LEFT_RIGHT = True  # Swap left and right eye (useful for mirrored webcams)
+AUTO_START_RECORDING = False  # Automatically start recording when tracking starts

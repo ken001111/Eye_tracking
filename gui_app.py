@@ -103,46 +103,55 @@ class GazeTrackingGUI:
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        # Configure grid weights
+        # Configure grid weights for Root
         self.root.columnconfigure(0, weight=1)
-        self.root.rowconfigure(0, weight=1)
-        main_frame.columnconfigure(1, weight=1)
+        self.root.rowconfigure(0, weight=1) # Main content
+        self.root.rowconfigure(1, weight=0) # Bottom bar (fixed height)
+
+        # Main container (Video + Metrics)
+        main_frame = ttk.Frame(self.root, padding="5")
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Configure grid weights for Main Frame
+        main_frame.columnconfigure(0, weight=3) # Video
+        main_frame.columnconfigure(1, weight=1) # Metrics
         main_frame.rowconfigure(0, weight=1)
         
         # Left panel: Video display
         video_frame = ttk.LabelFrame(main_frame, text="Video Feed", padding="5")
         video_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=5, pady=5)
-        main_frame.rowconfigure(0, weight=1)
         
         self.video_label = ttk.Label(video_frame, text="No video feed")
         self.video_label.pack(expand=True, fill=tk.BOTH)
         
-        # Right panel: Controls and metrics
+        # Right panel: Metrics Only (Controls moved to bottom)
         right_panel = ttk.Frame(main_frame)
         right_panel.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=5, pady=5)
         right_panel.columnconfigure(0, weight=1)
         
-        # Controls frame
-        controls_frame = ttk.LabelFrame(right_panel, text="Controls", padding="10")
-        controls_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=5)
-        controls_frame.columnconfigure(1, weight=1)
+        # --- BOTTOM ACTION BAR ---
+        bottom_bar = ttk.Frame(self.root, padding="10")
+        bottom_bar.grid(row=1, column=0, sticky=(tk.W, tk.E))
+        bottom_bar.columnconfigure(0, weight=1)
+        bottom_bar.columnconfigure(1, weight=1)
+        bottom_bar.columnconfigure(2, weight=1)
         
-        # Start/Stop button (tracker selection removed - using default)
-        self.start_stop_btn = ttk.Button(controls_frame, text="Start Tracking", 
+        # Start/Stop Button
+        self.start_stop_btn = ttk.Button(bottom_bar, text="Start Tracking", 
                                          command=self._toggle_tracking)
-        self.start_stop_btn.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        self.start_stop_btn.grid(row=0, column=0, padx=5, sticky=(tk.W, tk.E), ipady=10)
         
-        # Record button
-        self.record_btn = ttk.Button(controls_frame, text="Start Recording", 
+        # Record Button (Middle, Big)
+        self.record_btn = ttk.Button(bottom_bar, text="🔴 Start Recording", 
                                      command=self._toggle_recording, state=tk.DISABLED)
-        self.record_btn.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        self.record_btn.grid(row=0, column=1, padx=5, sticky=(tk.W, tk.E), ipady=10)
         
-        # Export button
-        self.export_btn = ttk.Button(controls_frame, text="Export Data", 
+        # Export Button
+        self.export_btn = ttk.Button(bottom_bar, text="Export Data", 
                                      command=self._export_data, state=tk.DISABLED)
-        self.export_btn.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        self.export_btn.grid(row=0, column=2, padx=5, sticky=(tk.W, tk.E), ipady=10)
         
-        # Metrics frame
+        # Metrics frame (Moved up since controls are gone)
         metrics_frame = ttk.LabelFrame(right_panel, text="Metrics", padding="10")
         metrics_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=5)
         metrics_frame.columnconfigure(1, weight=1)
@@ -163,7 +172,7 @@ class GazeTrackingGUI:
         for i, (label_text, key) in enumerate(metrics):
             ttk.Label(metrics_frame, text=label_text).grid(row=i, column=0, sticky=tk.W, pady=2)
             value_label = ttk.Label(metrics_frame, text="N/A", foreground="blue")
-            value_label.grid(row=i, column=1, sticky=tk.W, padx=10)
+            value_label.grid(row=i, column=1, sticky=tk.W, padx=40) # Increased spacing
             self.metrics_labels[key] = value_label
         
         # Diameter graphs frame
@@ -269,6 +278,10 @@ class GazeTrackingGUI:
             # Start update thread
             self.update_thread = threading.Thread(target=self._update_loop, daemon=True)
             self.update_thread.start()
+            
+            # Auto-start recording if enabled
+            if config.CSV_EXPORT_ENABLED and config.AUTO_START_RECORDING and not self.is_recording:
+                self._toggle_recording()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to start tracking: {e}")
             self.status_label.config(text="Start failed", foreground="red")
@@ -294,33 +307,62 @@ class GazeTrackingGUI:
         if not self.is_recording:
             self.data_logger.start_logging()
             self.is_recording = True
-            self.record_btn.config(text="Stop Recording")
+            self.record_btn.config(text="⬛ Stop Recording")
             self.export_btn.config(state=tk.DISABLED)
             self.status_label.config(text="Recording...", foreground="red")
         else:
+            # Prevent double-clicking
+            self.record_btn.config(state=tk.DISABLED, text="Saving...")
+            
+            # Stop in background thread to avoid freezing GUI (esp. on network/cloud drives)
+            threading.Thread(target=self._async_stop_recording, daemon=True).start()
+
+    def _async_stop_recording(self):
+        """Stop recording in background thread"""
+        try:
             self.data_logger.stop_logging()
-            self.is_recording = False
-            self.record_btn.config(text="Start Recording")
-            self.export_btn.config(state=tk.NORMAL)
-            self.status_label.config(text="Recording stopped", foreground="orange")
+        except Exception as e:
+            print(f"Error saving log: {e}")
+        finally:
+            # Schedule GUI update on main thread
+            self.root.after(0, self._finish_stopping_recording)
+            
+    def _finish_stopping_recording(self):
+        """Update GUI after recording stops"""
+        self.is_recording = False
+        self.record_btn.config(state=tk.NORMAL, text="🔴 Start Recording")
+        self.export_btn.config(state=tk.NORMAL)
+        self.status_label.config(text="Recording saved", foreground="orange")
     
     def _export_data(self):
         """Export recorded data"""
-        if self.data_logger.get_record_count() == 0:
-            messagebox.showinfo("Info", "No data to export")
-            return
-        
-        filename = filedialog.asksaveasfilename(
-            defaultextension=".csv",
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
-        )
-        
-        if filename:
-            try:
+        print("DEBUG: Export button clicked")
+        try:
+            count = self.data_logger.get_record_count()
+            print(f"DEBUG: Record count is {count}")
+            
+            if count == 0:
+                messagebox.showinfo("Info", "No data to export (Record count is 0)")
+                return
+            
+            # Use threading to prevent freezing dialog opening? No, dialogs must be on main thread.
+            
+            filename = filedialog.asksaveasfilename(
+                title="Export Data CSV",
+                defaultextension=".csv",
+                filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+            )
+            
+            if filename:
+                print(f"DEBUG: Selected filename: {filename}")
                 self.data_logger.export_to_csv(filename)
                 messagebox.showinfo("Success", f"Data exported to {filename}")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to export data: {e}")
+                
+        except Exception as e:
+            print(f"ERROR in export: {e}")
+            import traceback
+            traceback.print_exc()
+            messagebox.showerror("Export Error", f"Failed to export data:\n{e}")
     
     def _update_loop(self):
         """Main update loop for video processing"""
@@ -419,6 +461,16 @@ class GazeTrackingGUI:
         # Convert frame for display
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         frame_pil = Image.fromarray(frame_rgb)
+        
+        # Draw "REC" indicator if recording
+        if self.is_recording:
+            draw = ImageDraw.Draw(frame_pil)
+            # Red circle
+            draw.ellipse((20, 20, 40, 40), fill="red", outline="red")
+            # Text
+            # Note: PIL default font is small, but sufficient for simple indicator
+            draw.text((50, 20), "REC", fill="red")
+            
         frame_tk = ImageTk.PhotoImage(image=frame_pil)
         
         self.video_label.config(image=frame_tk, text="")

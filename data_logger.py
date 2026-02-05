@@ -58,7 +58,8 @@ class DataLogger:
         ]
         
         # Initialize CSV file
-        self._initialize_csv()
+        # self._initialize_csv() # MOVED to start_logging to prevent empty files
+        self.file_initialized = False
     
     def _generate_filename(self) -> str:
         """Generate filename with timestamp"""
@@ -71,12 +72,17 @@ class DataLogger:
             with open(self.output_file, 'w', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerow(self.headers)
+            self.file_initialized = True
         except Exception as e:
             print(f"Error initializing CSV file: {e}")
     
     def start_logging(self):
         """Start logging session"""
         with self.lock:
+            # Initialize file on first start if not already done
+            if not self.file_initialized:
+                self._initialize_csv()
+                
             self.is_logging = True
             self.start_time = time.time()
             self.record_count = 0
@@ -197,6 +203,13 @@ class DataLogger:
         if output_path != self.output_file:
             import shutil
             try:
-                shutil.copy2(self.output_file, output_path)
+                # Lazy creation check: if file doesn't exist yet but we have headers, create it
+                if not os.path.exists(self.output_file):
+                    self._initialize_csv()
+                    
+                if os.path.exists(self.output_file):
+                    shutil.copy2(self.output_file, output_path)
+                else:
+                    print(f"Error: Source file {self.output_file} does not exist even after init attempt.")
             except Exception as e:
                 print(f"Error copying file: {e}")

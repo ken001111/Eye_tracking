@@ -15,8 +15,11 @@ class Pupil(object):
         self.y = y
         self.diameter = diameter
         
-        # Only perform detection if coordinates not provided
-        if self.x is None or self.y is None:
+        # If coordinates provided but no diameter, use hybrid method
+        if self.x is not None and self.y is not None and self.diameter is None:
+            self.measure_diameter_at_location(eye_frame, self.x, self.y)
+        # If no coordinates provided, use full detection
+        elif self.x is None or self.y is None:
             self.detect_iris(eye_frame)
 
     @staticmethod
@@ -204,3 +207,43 @@ class Pupil(object):
             return float(np.mean(diameters))
         
         return None
+
+    def measure_diameter_at_location(self, eye_frame, target_x, target_y):
+        """
+        Measure pupil diameter around a known location (Hybrid approach).
+        Uses image thresholding but focused on the tracker-provided coordinates.
+        """
+        if eye_frame is None or eye_frame.size == 0:
+            return
+
+        # Perform image processing
+        processed = self.image_processing(eye_frame, self.threshold)
+        
+        # Find contours
+        contours, _ = cv2.findContours(processed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        if not contours:
+            return
+            
+        # Find the contour that best matches the target location
+        best_contour = None
+        min_dist = float('inf')
+        
+        for contour in contours:
+            # Check if target point is inside contour
+            dist = cv2.pointPolygonTest(contour, (target_x, target_y), True)
+            
+            if dist >= 0:
+                best_contour = contour
+                break
+            else:
+                if abs(dist) < min_dist:
+                    min_dist = abs(dist)
+                    closest_contour = contour
+        
+        # If no contour contained the point, use the closest one if it's very close
+        if best_contour is None and min_dist < 5.0 and 'closest_contour' in locals():
+            best_contour = closest_contour
+            
+        if best_contour is not None:
+             self.diameter = self.calculate_diameter(best_contour)

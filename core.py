@@ -156,6 +156,19 @@ class GazeTracking(object):
             self.eye_left = None
             self.eye_right = None
 
+        # Swap left/right if configured (e.g. for mirrored webcam)
+        import config
+        if config.SWAP_LEFT_RIGHT:
+            self.eye_left, self.eye_right = self.eye_right, self.eye_left
+            
+    def _get_tracker_side_string(self, eye_obj):
+        """Get the side string ('left' or 'right') that matches the tracker's internal indexing"""
+        if eye_obj is None:
+            return 'left'
+        # side=0 was created from tracker's 'left' data
+        # side=1 was created from tracker's 'right' data
+        return 'left' if eye_obj.side == 0 else 'right'
+
     def refresh(self, frame):
         """Refreshes the frame and analyzes it.
 
@@ -217,13 +230,14 @@ class GazeTracking(object):
             return None
         return eye_obj.frame
     
-    def _detect_eye_state_advanced(self, eye_frame):
+    def _detect_eye_state_advanced(self, eye_frame, eye_side='left'):
         """
         Advanced eye state detection using multiple methods.
         Assumes eye is OPEN unless proven closed (conservative approach).
         
         Args:
             eye_frame: Grayscale eye region
+            eye_side: 'left' or 'right'
             
         Returns:
             1 for open, 0 for closed
@@ -236,15 +250,9 @@ class GazeTracking(object):
         # Method 1: Use tracker's get_eye_state (only if enabled)
         if config.USE_TRACKER_EYE_STATE:
             try:
-                tracker_state = self.tracker.get_eye_state(eye_frame)
+                tracker_state = self.tracker.get_eye_state(eye_frame, eye_side)
                 if tracker_state is not None:
-                    # Only trust tracker if it says closed (be very conservative)
-                    if tracker_state == 0:
-                        # Double-check with EAR before declaring closed
-                        ear = self._calculate_improved_ear(eye_frame)
-                        if ear is not None and ear < config.EAR_THRESHOLD_CLOSED:
-                            return 0
-                    # If tracker says open, trust it
+                    # MediaPipe EAR is very reliable, trust it more
                     return tracker_state
             except Exception:
                 pass
@@ -344,42 +352,65 @@ class GazeTracking(object):
     def left_eye_state(self):
         """
         Get left eye state independently.
-        Very permissive - defaults to open unless strongly proven closed.
         
         Returns:
             1 for open, 0 for closed
         """
-        # If pupil is detected, eye is almost certainly open
-        if self.pupils_located and self.eye_left is not None and self.eye_left.pupil is not None:
-            if self.eye_left.pupil.x is not None and self.eye_left.pupil.y is not None:
-                return 1  # Pupil detected = eye is open
+        # PRIORITY CHANGE: Check geometric eye state first (EAR/Classifier)
+        # Previously, if a "pupil" was found (often false positive on eyelashes), 
+        # it forced state to OPEN. Now we check state first.
         
         left_frame = self._get_eye_region_frame(self.eye_left)
-        if left_frame is not None:
-            return self._detect_eye_state_advanced(left_frame)
+        state = 1
         
-        # Default to open (very permissive)
-        return 1
+        if left_frame is not None:
+            # Check if eye looks closed based on geometry (EAR)
+            # Use dynamic side string in case of swap
+            side_str = self._get_tracker_side_string(self.eye_left)
+            state = self._detect_eye_state_advanced(left_frame, side_str)
+            
+            # If detected as CLOSED (0), return immediately
+            # Do NOT let a false positive pupil detection override this
+            if state == 0:
+                return 0
+
+        # If geometry says OPEN (1), we double check if we have a pupil
+        # (Optional: we could just trust 'state', but pupil detection confirms it's definitely open)
+        if self.pupils_located and self.eye_left is not None and self.eye_left.pupil is not None:
+             if self.eye_left.pupil.x is not None and self.eye_left.pupil.y is not None:
+                 return 1
+        
+        # Fallback to whatever the advanced detection said (usually 1/open)
+        return state
     
     def right_eye_state(self):
         """
         Get right eye state independently.
-        Very permissive - defaults to open unless strongly proven closed.
         
         Returns:
             1 for open, 0 for closed
         """
-        # If pupil is detected, eye is almost certainly open
-        if self.pupils_located and self.eye_right is not None and self.eye_right.pupil is not None:
-            if self.eye_right.pupil.x is not None and self.eye_right.pupil.y is not None:
-                return 1  # Pupil detected = eye is open
+        # PRIORITY CHANGE: Check geometric eye state first (EAR/Classifier)
         
         right_frame = self._get_eye_region_frame(self.eye_right)
-        if right_frame is not None:
-            return self._detect_eye_state_advanced(right_frame)
+        state = 1
         
-        # Default to open (very permissive)
-        return 1
+        if right_frame is not None:
+            # Check if eye looks closed based on geometry (EAR)
+            # Use dynamic side string in case of swap
+            side_str = self._get_tracker_side_string(self.eye_right)
+            state = self._detect_eye_state_advanced(right_frame, side_str)
+            
+            # If detected as CLOSED (0), return immediately
+            if state == 0:
+                return 0
+        
+        # If geometry says OPEN (1), check pupil
+        if self.pupils_located and self.eye_right is not None and self.eye_right.pupil is not None:
+             if self.eye_right.pupil.x is not None and self.eye_right.pupil.y is not None:
+                 return 1
+        
+        return state
     
     def is_blinking(self):
         """
