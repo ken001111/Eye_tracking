@@ -1,253 +1,128 @@
-# Enhanced Gaze Tracking System
+# Gaze Tracking System (Stanford Eye Tracking Project)
 
 A modular, real-time eye tracking system using OpenCV with support for multiple tracking methods (ML and non-ML). Designed for clinical research applications with EEG/TEP/EMG data correlation.
-
-**Note**: This is an independent implementation built from scratch with a modular architecture. While inspired by open-source eye tracking projects, this codebase is original work.
-
-![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
-![OpenCV](https://img.shields.io/badge/OpenCV-4.8+-green.svg)
-![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 ## Features
 
 - **Multiple Tracking Methods**: Support for OpenCV DNN (ML), Haar Cascade (non-ML), and Hybrid approaches
 - **Real-time Performance**: Target 100Hz processing (minimum 50Hz)
 - **Advanced Metrics**: Pupil diameter, eye state classification (independent per eye)
-- **Safety Monitoring**: Out-of-frame detection and drowsiness monitoring with distinct alarms
-- **Data Export**: CSV export with high-precision timestamps for correlation with EEG/TEP/EMG data
+- **Safety Monitoring**: Out-of-frame detection
+- **Data Export**: CSV export with high-precision timestamps for correlation with other data
 - **GUI Application**: User-friendly interface with real-time visualization
 - **Modular Architecture**: Easy to extend with new tracking methods
 
-## Installation
+---
+
+## Installation & Setup
 
 ### Prerequisites
-
 - Python 3.8 or higher
 - Webcam
 - OpenCV 4.8.0 or higher
 
-### Quick Install
+### Easy Start (Recommended)
+Use the provided shell script to automatically handle dependencies and run the app:
 
 ```bash
-# Clone the repository
-git clone https://github.com/ken001111/Eye_Tracking
-cd GazeTracking
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Download model files (required for DNN tracker)
-python download_models.py  # See setup instructions below
+./run_tracking.sh
 ```
 
-### Manual Model Download
+### Manual Installation
 
-The DNN face detection model is large (~10MB) and not included in the repo. Download it:
+1. **Install Dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-```bash
-mkdir -p gaze_tracking/trained_models/opencv_dnn
-cd gaze_tracking/trained_models/opencv_dnn
+2. **Run the GUI**
+   ```bash
+   python gui_app.py
+   ```
 
-# Download DNN model files
-curl -L https://raw.githubusercontent.com/opencv/opencv/master/samples/dnn/face_detector/deploy.prototxt -o deploy.prototxt
-curl -L https://raw.githubusercontent.com/opencv/opencv_3rdparty/dnn_samples_face_detector_20170830/res10_300x300_ssd_iter_140000.caffemodel -o res10_300x300_ssd_iter_140000.caffemodel
-```
+---
 
-Haar cascade files are included in the repository.
+## Usage
 
-## Quick Start
+### GUI Controls
+- **Start/Stop Tracking**: Activates the camera and tracking algorithms.
+- **Start/Stop Recording**: Logs data to CSV.
+  - Files are automatically saved to the `recording_output/` folder.
+  - Filename format: `gaze_tracking_data_YYYYMMDD_HHMMSS.csv`
 
-### GUI Application
+### Data Export Format
+The system exports a CSV file with the following columns:
 
-Launch the GUI application:
+| Column | Description |
+|--------|-------------|
+| `timestamp` | High-precision timestamp (microsecond accuracy) |
+| `tracker_method` | Method used ('dnn', 'haar', 'hybrid') |
+| `left_pupil_x`, `y` | Left pupil coordinates |
+| `right_pupil_x`, `y` | Right pupil coordinates |
+| `left_pupil_diameter` | Diameter in pixels |
+| `right_pupil_diameter` | Diameter in pixels |
+| `eye_state` | 1 = Open, 0 = Closed |
+| `face_detected` | True/False |
 
-```bash
-python main.py
-# or
-python gui_app.py
-```
+---
 
-The webcam will start automatically. The system will:
-- Detect your face and eyes
-- Track pupil position and diameter (with real-time graphs)
-- Monitor eye state independently for each eye
-- Monitor for drowsiness and out-of-frame conditions
-- Display all metrics in real-time
+## Accuracy & Optimization
 
-### Python API
+### 1. Calibration
+The system performs auto-calibration during the first 20 frames.
+- **Distance**: Maintain 20-30 inches from the camera.
+- **Lighting**: Ensure even, front-facing lighting. Avoid strong backlighting.
+- **Positon**: Keep head relatively still during the first few seconds of tracking.
 
-```python
-import cv2
-from gaze_tracking import GazeTracking
+### 2. Tracker Methods
 
-# Initialize with default tracker (DNN)
-gaze = GazeTracking(tracker_type='dnn')
+| Method | Type | Accuracy | Speed | Use Case |
+|--------|------|----------|-------|----------|
+| **MediaPipe** | ML | High | Fast | **Default**, best balance of accuracy and speed |
+| **OpenCV DNN** | DL | High | Medium | Good fallback for older machines |
+| **Haar** | CPU | Low | Fast | Use only on very low-end hardware |
 
-# Open webcam
-webcam = cv2.VideoCapture(0)
+### 3. Improving Results
+- **Camera Position**: Mount camera at eye level.
+- **Reflections**: If wearing glasses, try to minimize screen reflection on the lenses.
+- **Resolution**: Lower resolution (640x480) yields higher FPS without significant accuracy loss.
 
-while True:
-    _, frame = webcam.read()
-    gaze.refresh(frame)
-    
-    # Get metrics
-    left_pupil = gaze.pupil_left_coords()
-    right_pupil = gaze.pupil_right_coords()
-    left_diameter = gaze.pupil_left_diameter()
-    right_diameter = gaze.pupil_right_diameter()
-    left_eye_state = gaze.left_eye_state()  # 1 = open, 0 = closed
-    right_eye_state = gaze.right_eye_state()  # 1 = open, 0 = closed
-    
-    # Display annotated frame
-    annotated = gaze.annotated_frame()
-    cv2.imshow("Gaze Tracking", annotated)
-    
-    if cv2.waitKey(1) == 27:  # ESC key
-        break
-
-webcam.release()
-cv2.destroyAllWindows()
-```
-
-## System Requirements
-
-### Meeting Minutes Requirements (January 29, 2026)
-
-This system meets the following requirements:
-
-- ✅ Simultaneous identification of pupil and eye coordinates
-- ✅ Continuous calculation of pupil diameter with real-time graphs
-- ✅ Binary classification of eye state (Open vs. Closed)
-- ✅ Performance: 50Hz minimum (target 100Hz)
-- ✅ Real-time processing
-- ✅ Out-of-frame notification with distinct alarm
-- ✅ Alertness protocol with distinct alarm for drowsiness
-- ✅ Distance validation (20-30 inches)
-- ✅ CSV export for correlation with EEG/TEP/EMG data
+---
 
 ## Architecture
 
-### Modular Tracker System
+The system uses a modular architecture:
 
 ```
 gaze_tracking/
 ├── trackers/
 │   ├── base_tracker.py       # Abstract base class
-│   ├── opencv_dnn_tracker.py # ML-based tracker (default)
-│   ├── opencv_haar_tracker.py # Non-ML tracker
-│   └── hybrid_tracker.py     # Combined approach
+│   └── mediapipe_tracker.py  # MediaPipe-based tracker
 ├── gaze_tracking.py          # Main API
 ├── eye.py                    # Eye detection
 ├── pupil.py                  # Pupil detection with diameter
-├── safety_monitor.py         # Safety features
-├── data_logger.py            # CSV export
-└── performance_monitor.py    # Performance tracking
+├── safety_monitor.py         # Safety features (blinks, etc.)
+├── data_logger.py            # CSV export logic
+└── performance_monitor.py    # FPS tracking
 ```
 
-## Tracker Methods
+---
 
-| Method | Type | Accuracy | Speed | Use Case |
-|--------|------|----------|-------|----------|
-| **OpenCV DNN** | ML | High | Medium | Default, best accuracy |
-| **OpenCV Haar** | Non-ML | Medium | Fast | Fast processing |
-| **Hybrid** | Combined | High | Medium-Fast | Best balance |
+## Authors & Acknowledgments
 
-## Data Export Format
+**Primary Developer**: Jongseo Ken Lee
+- Email: jongseo001111@gmail.com
+- GitHub: [@ken001111](https://github.com/ken001111)
 
-CSV files contain the following columns:
+**Project Information**:
+Developed for the **Stanford Eye Tracking Project (2026)**.
 
-- `timestamp`: High-precision timestamp (microsecond accuracy)
-- `tracker_method`: Tracker method used
-- `left_pupil_x`, `left_pupil_y`: Left pupil coordinates
-- `right_pupil_x`, `right_pupil_y`: Right pupil coordinates
-- `left_pupil_diameter`, `right_pupil_diameter`: Pupil diameters in pixels
-- `eye_state`: 1 for open, 0 for closed
-- `drowsiness_score`: Drowsiness score (0.0-1.0)
-- `fps`: Current FPS
-- `face_detected`: Boolean
-- `processing_latency_ms`: Processing latency in milliseconds
+**Acknowledgments**:
+- OpenCV (Computer Vision)
+- MediaPipe (Face Mesh)
+- NumPy, Pandas, Pillow
 
-## Improving Accuracy
-
-See [ACCURACY_IMPROVEMENT.md](ACCURACY_IMPROVEMENT.md) for comprehensive guidance on:
-- Calibration techniques
-- Better models (MediaPipe, YOLOv8, RetinaFace)
-- Improved preprocessing
-- Hardware recommendations
-- Machine learning enhancements
-
-## Configuration
-
-Edit `config.py` to customize:
-- Tracker method (default: 'dnn')
-- Performance targets (FPS, latency)
-- Distance validation range (20-30 inches)
-- Safety monitor thresholds
-- Alarm settings
-- Data logging options
-
-## Safety Features
-
-### Out-of-Frame Detection
-- Monitors if participant exits camera's field of view
-- Triggers distinct alarm (800Hz beep, orange warning)
-- Configurable threshold (default: 5 frames)
-
-### Drowsiness Monitoring
-- Uses PERCLOS (Percentage of Eyelid Closure)
-- Tracks blink frequency
-- Triggers distinct alarm (1200Hz beep, red warning)
-- Configurable sensitivity
-
-## Troubleshooting
-
-### Low FPS
-- Try Haar tracker instead of DNN
-- Reduce webcam resolution
-- Close other applications
-
-### Poor Detection
-- Ensure good lighting
-- Position 20-30 inches from camera
-- Check camera focus
-
-### No Face Detected
-- Check camera connection
-- Ensure participant is in frame
-- Adjust lighting
-- Check camera permissions
-
-## Contributing
-
-Contributions welcome! Areas for improvement:
-- Additional tracker methods
-- Performance optimizations
-- Calibration improvements
-- Documentation enhancements
+---
 
 ## License
-
 MIT License - See LICENSE file for details.
-
-## Citation
-
-If you use this system in your research, please cite:
-
-```bibtex
-@software{gaze_tracking_enhanced,
-  title={Enhanced Gaze Tracking System for Clinical Research},
-  author={[Your Name]},
-  year={2026},
-  institution={Stanford University, Department of Neuroradiology},
-  url={https://github.com/yourusername/gaze-tracking}
-}
-```
-
-## Acknowledgments
-
-- OpenCV: https://opencv.org/
-- Meeting Minutes: January 29, 2026 - Eye Tracking Project Requirements (Stanford Neuroradiology)
-
-## Support
-
-For issues or questions, please open an issue on GitHub or refer to the troubleshooting section.
