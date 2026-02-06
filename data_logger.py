@@ -35,7 +35,7 @@ class DataLogger:
         self.auto_flush = auto_flush
         
         self.buffer = deque(maxlen=buffer_size)
-        self.lock = threading.Lock()
+        self.lock = threading.RLock() # Re-entrant lock to prevent deadlocks
         self.is_logging = False
         self.start_time = None
         self.record_count = 0
@@ -51,10 +51,7 @@ class DataLogger:
             'left_pupil_diameter',
             'right_pupil_diameter',
             'eye_state',
-            'drowsiness_score',
-            'fps',
-            'face_detected',
-            'processing_latency_ms'
+            'face_detected'
         ]
         
         # Initialize CSV file
@@ -62,9 +59,11 @@ class DataLogger:
         self.file_initialized = False
     
     def _generate_filename(self) -> str:
-        """Generate filename with timestamp"""
+        """Generate filename with timestamp in recording_output folder"""
+        output_dir = "recording_output"
+        os.makedirs(output_dir, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return f"gaze_tracking_data_{timestamp}.csv"
+        return os.path.join(output_dir, f"gaze_tracking_data_{timestamp}.csv")
     
     def _initialize_csv(self):
         """Initialize CSV file with headers"""
@@ -100,10 +99,7 @@ class DataLogger:
             left_pupil_diameter: Optional[float] = None,
             right_pupil_diameter: Optional[float] = None,
             eye_state: Optional[int] = None,
-            drowsiness_score: Optional[float] = None,
-            fps: Optional[float] = None,
             face_detected: Optional[bool] = None,
-            processing_latency_ms: Optional[float] = None,
             timestamp: Optional[float] = None):
         """
         Log a data record.
@@ -115,10 +111,7 @@ class DataLogger:
             left_pupil_diameter: Diameter of left pupil in pixels
             right_pupil_diameter: Diameter of right pupil in pixels
             eye_state: 1 for open, 0 for closed
-            drowsiness_score: Drowsiness score (0.0-1.0)
-            fps: Current FPS
             face_detected: True if face detected
-            processing_latency_ms: Processing latency in milliseconds
             timestamp: Optional timestamp (defaults to current time)
         """
         if not self.is_logging:
@@ -145,10 +138,7 @@ class DataLogger:
             left_pupil_diameter,
             right_pupil_diameter,
             eye_state,
-            drowsiness_score,
-            fps,
-            face_detected,
-            processing_latency_ms
+            face_detected
         ]
         
         # Thread-safe append to buffer

@@ -3,16 +3,12 @@
 ## Primary Developer
 
 **Jongseo Ken Lee**
-- Stanford University, Department of Neuroradiology
 - Email: jongseo001111@gmail.com
 - GitHub: [@ken001111](https://github.com/ken001111)
 
 ## Project Information
 
-This project was developed as part of the Stanford Neuroradiology Eye Tracking Project (2026).
-
-**Meeting Minutes**: January 29, 2026
-**Attendees**: Dr. Cline, Dr. Hassan, Ken Lee
+This project was developed as part of the Stanford Eye Tracking Project (2026).
 
 ## Acknowledgments
 

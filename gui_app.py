@@ -99,9 +99,6 @@ class GazeTrackingGUI:
     
     def _create_widgets(self):
         """Create GUI widgets"""
-        # Main container
-        main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # Configure grid weights for Root
         self.root.columnconfigure(0, weight=1)
@@ -113,8 +110,8 @@ class GazeTrackingGUI:
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # Configure grid weights for Main Frame
-        main_frame.columnconfigure(0, weight=3) # Video
-        main_frame.columnconfigure(1, weight=1) # Metrics
+        main_frame.columnconfigure(0, weight=4) # Video (80%)
+        main_frame.columnconfigure(1, weight=1) # Metrics (20%)
         main_frame.rowconfigure(0, weight=1)
         
         # Left panel: Video display
@@ -134,7 +131,6 @@ class GazeTrackingGUI:
         bottom_bar.grid(row=1, column=0, sticky=(tk.W, tk.E))
         bottom_bar.columnconfigure(0, weight=1)
         bottom_bar.columnconfigure(1, weight=1)
-        bottom_bar.columnconfigure(2, weight=1)
         
         # Start/Stop Button
         self.start_stop_btn = ttk.Button(bottom_bar, text="Start Tracking", 
@@ -146,11 +142,6 @@ class GazeTrackingGUI:
                                      command=self._toggle_recording, state=tk.DISABLED)
         self.record_btn.grid(row=0, column=1, padx=5, sticky=(tk.W, tk.E), ipady=10)
         
-        # Export Button
-        self.export_btn = ttk.Button(bottom_bar, text="Export Data", 
-                                     command=self._export_data, state=tk.DISABLED)
-        self.export_btn.grid(row=0, column=2, padx=5, sticky=(tk.W, tk.E), ipady=10)
-        
         # Metrics frame (Moved up since controls are gone)
         metrics_frame = ttk.LabelFrame(right_panel, text="Metrics", padding="10")
         metrics_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=5)
@@ -159,9 +150,6 @@ class GazeTrackingGUI:
         # Create metrics labels
         self.metrics_labels = {}
         metrics = [
-            ("FPS:", "fps"),
-            ("Latency (ms):", "latency"),
-            ("Distance (in):", "distance"),
             ("Left Eye Center:", "left_eye_center"),
             ("Right Eye Center:", "right_eye_center"),
             ("Left Eye State:", "left_eye_state"),
@@ -308,7 +296,6 @@ class GazeTrackingGUI:
             self.data_logger.start_logging()
             self.is_recording = True
             self.record_btn.config(text="⬛ Stop Recording")
-            self.export_btn.config(state=tk.DISABLED)
             self.status_label.config(text="Recording...", foreground="red")
         else:
             # Prevent double-clicking
@@ -330,39 +317,19 @@ class GazeTrackingGUI:
     def _finish_stopping_recording(self):
         """Update GUI after recording stops"""
         self.is_recording = False
-        self.record_btn.config(state=tk.NORMAL, text="🔴 Start Recording")
-        self.export_btn.config(state=tk.NORMAL)
-        self.status_label.config(text="Recording saved", foreground="orange")
+        self.record_btn.config(state=tk.NORMAL, text="✅ Saved")
+        self.status_label.config(text="Recording saved", foreground="green")
+        
+        # Revert button text after 2 seconds
+        self.root.after(2000, self._reset_record_button)
+        
+    def _reset_record_button(self):
+        """Reset record button text if not recording"""
+        if not self.is_recording:
+            self.record_btn.config(text="🔴 Start Recording")
+            self.status_label.config(text="Ready", foreground="black")
     
-    def _export_data(self):
-        """Export recorded data"""
-        print("DEBUG: Export button clicked")
-        try:
-            count = self.data_logger.get_record_count()
-            print(f"DEBUG: Record count is {count}")
-            
-            if count == 0:
-                messagebox.showinfo("Info", "No data to export (Record count is 0)")
-                return
-            
-            # Use threading to prevent freezing dialog opening? No, dialogs must be on main thread.
-            
-            filename = filedialog.asksaveasfilename(
-                title="Export Data CSV",
-                defaultextension=".csv",
-                filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
-            )
-            
-            if filename:
-                print(f"DEBUG: Selected filename: {filename}")
-                self.data_logger.export_to_csv(filename)
-                messagebox.showinfo("Success", f"Data exported to {filename}")
-                
-        except Exception as e:
-            print(f"ERROR in export: {e}")
-            import traceback
-            traceback.print_exc()
-            messagebox.showerror("Export Error", f"Failed to export data:\n{e}")
+
     
     def _update_loop(self):
         """Main update loop for video processing"""
@@ -399,10 +366,6 @@ class GazeTrackingGUI:
             
             # Log data if recording
             if self.is_recording and self.data_logger is not None:
-                drowsiness_score = 0.0
-                if self.safety_monitor is not None:
-                    drowsiness_score = self.safety_monitor.drowsiness_monitor.get_drowsiness_score()
-                
                 self.data_logger.log(
                     tracker_method=self.gaze.tracker_type,
                     left_pupil_coords=self.gaze.pupil_left_coords(),
@@ -410,10 +373,7 @@ class GazeTrackingGUI:
                     left_pupil_diameter=self.gaze.pupil_left_diameter(),
                     right_pupil_diameter=self.gaze.pupil_right_diameter(),
                     eye_state=eye_state,
-                    drowsiness_score=drowsiness_score,
-                    fps=self.performance_monitor.get_fps(),
-                    face_detected=self.gaze.is_face_detected(),
-                    processing_latency_ms=self.performance_monitor.get_latency_ms()
+                    face_detected=self.gaze.is_face_detected()
                 )
             
             # Update diameter data for graphs
@@ -478,16 +438,8 @@ class GazeTrackingGUI:
         
         # Update metrics
         if config.GUI_SHOW_METRICS:
-            self.metrics_labels["fps"].config(
-                text=f"{self.performance_monitor.get_fps():.1f}"
-            )
-            self.metrics_labels["latency"].config(
-                text=f"{self.performance_monitor.get_latency_ms():.2f}"
-            )
-            distance = self.performance_monitor.get_distance()
-            self.metrics_labels["distance"].config(
-                text=f"{distance:.1f}" if distance else "N/A"
-            )
+            # Note: FPS, Latency, Distance removed per user request
+            pass
             # Eye center coordinates
             left_eye_center = self.gaze.eye_left_center()
             if left_eye_center:
@@ -561,7 +513,7 @@ class GazeTrackingGUI:
         y_max = max_diameter + range_diameter * 0.1
         
         # Draw axes (black)
-        margin = 40
+        margin = 60  # Increased from 40 to prevent overlap
         graph_width = width - 2 * margin
         graph_height = height - 2 * margin
         
@@ -571,8 +523,8 @@ class GazeTrackingGUI:
         canvas.create_line(margin, margin, margin, height - margin, fill="black", width=2)
         
         # Draw axis labels
-        canvas.create_text(margin // 2, height // 2, text="Diameter (px)", angle=90, fill="black", font=("Arial", 9))
-        canvas.create_text(width // 2, height - margin // 2, text="Time (s)", fill="black", font=("Arial", 9))
+        canvas.create_text(margin // 3, height // 2, text="Diameter (px)", angle=90, fill="black", font=("Arial", 9))
+        canvas.create_text(width // 2, height - margin // 3, text="Time (s)", fill="black", font=("Arial", 9))
         
         # Draw Y-axis scale
         num_ticks = 5
@@ -606,7 +558,7 @@ class GazeTrackingGUI:
     
     def _draw_empty_graph(self, canvas, width, height, title):
         """Draw an empty graph with axes"""
-        margin = 40
+        margin = 60  # Increased from 40
         graph_width = width - 2 * margin
         graph_height = height - 2 * margin
         
@@ -616,8 +568,8 @@ class GazeTrackingGUI:
         canvas.create_line(margin, margin, margin, height - margin, fill="black", width=2)
         
         # Labels
-        canvas.create_text(margin // 2, height // 2, text="Diameter (px)", angle=90, fill="black", font=("Arial", 9))
-        canvas.create_text(width // 2, height - margin // 2, text="Time (s)", fill="black", font=("Arial", 9))
+        canvas.create_text(margin // 3, height // 2, text="Diameter (px)", angle=90, fill="black", font=("Arial", 9))
+        canvas.create_text(width // 2, height - margin // 3, text="Time (s)", fill="black", font=("Arial", 9))
         
         # No data message
         canvas.create_text(width // 2, height // 2, text="No data", fill="gray", font=("Arial", 12))
