@@ -1,4 +1,4 @@
-# Gaze Tracking System (Stanford Eye Tracking Project)
+# Gaze Tracking System
 
 A modular, real-time eye tracking system using OpenCV with support for multiple tracking methods (ML and non-ML). Designed for clinical research applications with EEG/TEP/EMG data correlation.
 
@@ -105,6 +105,58 @@ gaze_tracking/
 ├── data_logger.py            # CSV export logic
 └── performance_monitor.py    # FPS tracking
 ```
+
+---
+
+## System Pipeline
+
+The system follows a strict 5-step processing pipeline for every frame:
+
+1.  **Input Acquisition**
+    -   Captures raw video frames from the webcam via OpenCV.
+
+2.  **Face & Landmark Detection**
+    -   **Engine**: MediaPipe Face Mesh.
+    -   **Output**: 468 3D facial landmarks.
+    -   **Role**: Provides robust head pose estimation and precise eye region coordinates, even with head rotation.
+
+3.  **Eye Region Processing**
+    -   **ROI Extraction**: Cuts out the eye regions based on specific landmark indices.
+    -   **Preprocessing**:
+        -   *Bilateral Filtering*: smooths skin texture while preserving pupil edges.
+        -   *Adaptive Thresholding*: dynamically separates the dark pupil from the iris/sclera, handling uneven lighting.
+        -   *Morphological Ops*: cleans up noise and small gaps.
+
+4.  **Feature Extraction**
+    -   **Pupil**: Finds the largest contour in the thresholded eye region and fits an ellipse to calculate the exact center and diameter (in pixels).
+    -   **Blinks**: Calculates Eye Aspect Ratio (EAR). If EAR < 0.22, it counts as a blink.
+    -   **Drowsiness**: Monitors PERCLOS (Percentage of Eyelid Closure) over a sliding window.
+
+5.  **Data Output**
+    -   Syncs all metrics with a microsecond-precision timestamp.
+    -   Logs data to `recording_output/` as a CSV file.
+
+---
+
+## File Structure
+
+Here is a quick overview of the Python files in the repository:
+
+| File | Description |
+|------|-------------|
+| **`main.py`** | Entry point. Handles command-line arguments and launches the system. |
+| **`gui_app.py`** | The graphical user interface (Tkinter). Handles the window, buttons, value display, and video feed. |
+| **`core.py`** | Contains the `GazeTracking` class. This is the central brain that orchestrates face detection, eye processing, and data collection. |
+| **`config.py`** | Central configuration file. Contains constants for thresholds, colors, and camera settings. |
+| **`pupil.py`** | Handles the image processing algorithms to find the pupil within an eye region (filtering, thresholding, contour detection). |
+| **`eye.py`** | Represents a single eye. Stores the pupil object, coordinates, and blinking state. |
+| **`calibration.py`** | Manages the initial calibration phase to adapt thresholds to the user's lighting. |
+| **`data_logger.py`** | Handles thread-safe CSV logging. Creates `recording_output/` and saves data. |
+| **`safety_monitor.py`** | Analyzes tracking data over time to detect drowsiness (PERCLOS) or distraction. |
+| **`performance_monitor.py`** | Tracks system metrics like FPS and processing latency. |
+| **`trackers/`** | Directory containing the tracker implementations. |
+| ↳ `mediapipe_tracker.py` | Implementation using Google MediaPipe Face Mesh (468 landmarks). |
+| ↳ `base_tracker.py` | Abstract interface that all trackers must adhere to. |
 
 ---
 
