@@ -8,7 +8,6 @@ A modular real-time eye tracking pipeline designed for behavioral and clinical r
 https://github.com/user-attachments/assets/1a2c9992-02c6-429d-b597-5c0acc8bcc18
 
 
-*(Add demo gif/video here)*
 
 ## 🚀 Quick Start
 
