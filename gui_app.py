@@ -428,8 +428,25 @@ class GazeTrackingGUI:
             # Red circle
             draw.ellipse((20, 20, 40, 40), fill="red", outline="red")
             # Text
-            # Note: PIL default font is small, but sufficient for simple indicator
             draw.text((50, 20), "REC", fill="red")
+            
+        # Check for Out of Frame Alarm
+        if self.safety_monitor is not None and self.safety_monitor.out_of_frame_monitor.is_alarm_active():
+            draw = ImageDraw.Draw(frame_pil)
+            width, height = frame_pil.size
+            # Draw red banner at top
+            draw.rectangle([0, 0, width, 40], fill=(255, 0, 0, 128))
+            # Draw text centered in banner
+            text = "⚠️ NO FACE DETECTED"
+            # Simple centering (msg length * approx char width)
+            text_width = len(text) * 7 
+            draw.text(((width - text_width) // 2, 10), text, fill="white")
+            
+            # Update status label to red warning
+            self.status_label.config(text="⚠️ NO FACE DETECTED", foreground="red")
+        elif not self.is_recording and self.status_label.cget("text") == "⚠️ NO FACE DETECTED":
+            # Reset status if alarm clears (and not recording)
+            self.status_label.config(text="Ready", foreground="black")
             
         frame_tk = ImageTk.PhotoImage(image=frame_pil)
         
