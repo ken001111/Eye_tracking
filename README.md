@@ -9,12 +9,12 @@ https://github.com/user-attachments/assets/1a2c9992-02c6-429d-b597-5c0acc8bcc18
 
 
 
-## ✨ Key Features
+## Key Features
 *   **Real-Time Tracking**: Hybrid MediaPipe + OpenCV pipeline (Processing at ~30+ FPS).
 *   **Visual Safety Alarm**: Prominent **"FACE NOT DETECTED"** warning banner on the video feed if the participant moves out of frame.
 *   **Data Export**: Automatic CSV logging with microsecond timestamps.
-*   **Drowsiness Detection**: PERCLOS and blink frequency monitoring.
-## 🚀 Quick Start
+
+## Quick Start
 
 Run the system with a single command (handles venv & dependencies automatically):
 
@@ -22,7 +22,7 @@ Run the system with a single command (handles venv & dependencies automatically)
 ./run_tracking.sh
 ```
 
-## ⚙️ System Pipeline
+## System Pipeline
 
 The system processes every frame in 5 steps:
 
@@ -35,7 +35,7 @@ The system processes every frame in 5 steps:
     *   **Drowsiness**: PERCLOS (Percentage of Eyelid Closure).
 5.  **Output**: Data logged to `recording_output/*.csv` with microsecond timestamps.
 
-## 📂 File Structure
+## File Structure
 
 | File | Description |
 |------|-------------|
@@ -48,7 +48,7 @@ The system processes every frame in 5 steps:
 | `safety_monitor.py` | Drowsiness & distraction logic. |
 | `trackers/*.py` | Modular tracker backends (currently MediaPipe). |
 
-## 📊 Data Export
+## Data Export
 
 CSVs are saved to `recording_output/` and contain:
 `timestamp`, `tracker_method`, `left/right_pupil_x_y`, `left/right_pupil_diameter`, `eye_state`, `face_detected`.
