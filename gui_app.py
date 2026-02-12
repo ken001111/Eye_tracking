@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import cv2
 import numpy as np
-from PIL import Image, ImageTk, ImageDraw
+from PIL import Image, ImageTk, ImageDraw, ImageFont
 import threading
 import time
 from collections import deque
@@ -434,16 +434,44 @@ class GazeTrackingGUI:
         if self.safety_monitor is not None and self.safety_monitor.out_of_frame_monitor.is_alarm_active():
             draw = ImageDraw.Draw(frame_pil)
             width, height = frame_pil.size
-            # Draw red banner at top
-            draw.rectangle([0, 0, width, 40], fill=(255, 0, 0, 128))
+            
+            # Load large font (try system fonts)
+            try:
+                # Try common system fonts for "Bold" look
+                # macOS
+                font = ImageFont.truetype("Arial.ttf", 30)
+            except IOError:
+                try:
+                    # Linux/Windows generic
+                    font = ImageFont.truetype("arial.ttf", 30)
+                except IOError:
+                    # Fallback to default (will be small, but readable)
+                    font = ImageFont.load_default()
+            
+            # Draw red banner at top (increased height for bigger text)
+            banner_height = 40
+            draw.rectangle([0, 0, width, banner_height], fill=(255, 0, 0, 128))
+            
             # Draw text centered in banner
-            text = "⚠️ NO FACE DETECTED"
-            # Simple centering (msg length * approx char width)
-            text_width = len(text) * 7 
-            draw.text(((width - text_width) // 2, 10), text, fill="white")
+            text = "FACE NOT DETECTED"
+            
+            # Calculate text size for centering
+            try:
+                left, top, right, bottom = font.getbbox(text)
+                text_width = right - left
+                text_height = bottom - top
+            except AttributeError:
+                 # Fallback for older Pillow versions
+                 text_width = len(text) * 20
+                 text_height = 40
+            
+            x = (width - text_width) // 2
+            y = (banner_height - text_height) // 2
+            
+            draw.text((x, y), text, fill="white", font=font)
             
             # Update status label to red warning
-            self.status_label.config(text="⚠️ NO FACE DETECTED", foreground="red")
+            self.status_label.config(text="Face Not Detected", foreground="red")
         elif not self.is_recording and self.status_label.cget("text") == "⚠️ NO FACE DETECTED":
             # Reset status if alarm clears (and not recording)
             self.status_label.config(text="Ready", foreground="black")
