@@ -9,6 +9,11 @@ https://github.com/user-attachments/assets/1a2c9992-02c6-429d-b597-5c0acc8bcc18
 
 
 
+## ✨ Key Features
+*   **Real-Time Tracking**: Hybrid MediaPipe + OpenCV pipeline (Processing at ~30+ FPS).
+*   **Visual Safety Alarm**: Prominent **"FACE NOT DETECTED"** warning banner on the video feed if the participant moves out of frame.
+*   **Data Export**: Automatic CSV logging with microsecond timestamps.
+*   **Drowsiness Detection**: PERCLOS and blink frequency monitoring.
 ## 🚀 Quick Start
 
 Run the system with a single command (handles venv & dependencies automatically):
