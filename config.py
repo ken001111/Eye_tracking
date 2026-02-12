@@ -16,7 +16,8 @@ FPS_WINDOW_SIZE = 30  # Number of frames to average for FPS
 DISTANCE_RANGE_INCHES = (20.0, 30.0)  # Valid distance range (min, max)
 
 # Safety Monitor Settings
-OUT_OF_FRAME_THRESHOLD = 5  # Consecutive frames without face to trigger alarm
+OUT_OF_FRAME_THRESHOLD = 2  # Consecutive frames without face to trigger alarm
+EDGE_MARGIN_PIXELS = -100  # Pixels from edge (negative = allow overlap)
 PERCLOS_THRESHOLD = 0.7  # PERCLOS threshold for drowsiness (0.0-1.0) - increased to reduce false alarms
 BLINK_FREQUENCY_THRESHOLD = 0.05  # Minimum blinks per second (reduced threshold)
 DROWSINESS_WINDOW_SIZE = 120  # Frames to analyze for PERCLOS (increased for more stable measurement)

@@ -29,14 +29,34 @@ class OutOfFrameMonitor:
         self.alarm_active = False
         self.last_face_time = None
     
-    def update(self, face_detected: bool):
+    def update(self, face_detected: bool, face_bbox=None, frame_width=0, frame_height=0):
         """
         Update monitor with current frame's face detection status.
         
         Args:
             face_detected: True if face detected in current frame
+            face_bbox: Tuple (x, y, w, h) of face bounding box
+            frame_width: Width of video frame
+            frame_height: Height of video frame
         """
-        if face_detected:
+        is_out_of_frame = not face_detected
+        
+        # Check if face is partially out of frame (touching edges)
+        if face_detected and face_bbox is not None and frame_width > 0 and frame_height > 0:
+            import config
+            margin = getattr(config, 'EDGE_MARGIN_PIXELS', 10)
+            x, y, w, h = face_bbox
+            
+            # Check edges
+            touching_left = x < margin
+            touching_top = y < margin
+            touching_right = (x + w) > (frame_width - margin)
+            touching_bottom = (y + h) > (frame_height - margin)
+            
+            if touching_left or touching_top or touching_right or touching_bottom:
+                is_out_of_frame = True
+        
+        if not is_out_of_frame:
             self.consecutive_no_face = 0
             self.alarm_active = False
             self.last_face_time = time.time()
@@ -355,7 +375,8 @@ class SafetyMonitor:
             alarm_callback=self.alarm_system.trigger_alarm
         )
     
-    def update(self, face_detected: bool, eye_state: Optional[int] = None, timestamp: Optional[float] = None):
+    def update(self, face_detected: bool, eye_state: Optional[int] = None, timestamp: Optional[float] = None,
+               face_bbox=None, frame_width=0, frame_height=0):
         """
         Update safety monitors with current frame data.
         
@@ -363,8 +384,11 @@ class SafetyMonitor:
             face_detected: True if face detected
             eye_state: 1 for open, 0 for closed (optional)
             timestamp: Optional timestamp
+            face_bbox: Face bounding box (x,y,w,h)
+            frame_width: Frame width
+            frame_height: Frame height
         """
-        self.out_of_frame_monitor.update(face_detected)
+        self.out_of_frame_monitor.update(face_detected, face_bbox, frame_width, frame_height)
         
         if eye_state is not None:
             self.drowsiness_monitor.update(eye_state, timestamp)

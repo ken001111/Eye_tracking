@@ -359,9 +359,12 @@ class GazeTrackingGUI:
             eye_state = self.gaze.eye_state()
             if self.safety_monitor is not None:
                 self.safety_monitor.update(
-                    self.gaze.is_face_detected(),
-                    eye_state,
-                    time.time()
+                    face_detected=self.gaze.is_face_detected(),
+                    eye_state=eye_state,
+                    timestamp=time.time(),
+                    face_bbox=self.gaze.face_bbox,
+                    frame_width=frame_width,
+                    frame_height=frame_height
                 )
             
             # Log data if recording
