@@ -55,10 +55,12 @@ HISTOGRAM_THRESHOLD = 0.2  # Histogram variance threshold for closed eye (lower 
 CONTOUR_AREA_THRESHOLD = 0.05  # Minimum contour area ratio for open eye (lower = less sensitive)
 
 # Webcam Settings
-WEBCAM_INDEX = 0  # Default webcam index
-WEBCAM_WIDTH = 640  # Desired width
-WEBCAM_HEIGHT = 480  # Desired height
-WEBCAM_FPS = 30  # Desired FPS (may not be achievable)
+WEBCAM_INDEX = 0  # Default webcam index (Change to 1 if using external USB camera)
+WEBCAM_WIDTH = 640  # Low Res: 640, HD: 1280, Full HD: 1920
+WEBCAM_HEIGHT = 480  # Low Res: 480, HD: 720, Full HD: 1080
+WEBCAM_FPS = 30  # Standard: 30, High Performance: 60 (if camera supports it)
+
+# NOTE: If you increase resolution, you may need to increase EDGE_MARGIN_PIXELS (e.g. -200 for HD)
 
 # Export Settings
 CSV_EXPORT_ENABLED = True
