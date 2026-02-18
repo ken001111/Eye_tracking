@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 
 echo ========================================================
-echo  Setting up Portable Python 3.11 (Fixing Imports)
+echo  Setting up Portable Python 3.11 (Fixing Imports v2)
 echo ========================================================
 
 IF EXIST "python_portable" (
@@ -21,12 +21,9 @@ tar -xf python_portable.zip -C python_portable
 echo Cleaning up zip...
 del python_portable.zip
 
-echo Configuring environment (pip + local imports)...
-REM 1. Enable 'import site' for pip
+echo Configuring environment (pip)...
+REM Enable 'import site' for pip
 powershell -Command "(Get-Content python_portable\python311._pth) -replace '#import site', 'import site' | Set-Content python_portable\python311._pth"
-
-REM 2. Add current directory to path so main.py can import gui_app.py
-echo .>> "python_portable\python311._pth"
 
 echo Downloading pip installer...
 curl -L -o get-pip.py "https://bootstrap.pypa.io/get-pip.py"
@@ -52,9 +49,11 @@ echo  Setup Complete!
 echo  To run the app, double-click: run_portable.bat
 echo ========================================================
 
+REM Create the runner script with explicit PYTHONPATH
 (
 echo @echo off
 echo cd /d "%%~dp0"
+echo set PYTHONPATH=%%~dp0
 echo "python_portable\python.exe" main.py --mode gui
 echo pause
 ) > run_portable.bat
