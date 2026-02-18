@@ -2,58 +2,70 @@ import sys
 import os
 import glob
 
-print("=== PORTABLE LAUNCHER DIAGNOSTICS ===")
+print("=== PORTABLE LAUNCHER DIAGNOSTICS (v2) ===")
 
 # 1. Force add current directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
-print(f"Added to sys.path: {current_dir}")
 
-# 2. Check site-packages
-print("\nChecking installed packages...")
-try:
-    # Find site-packages in the portable folder
-    site_packages = glob.glob(os.path.join(current_dir, "python_portable", "Lib", "site-packages"))
-    if not site_packages:
-        # Fallback for different layout
-        site_packages = glob.glob(os.path.join(current_dir, "python_portable", "*", "site-packages"))
-    
-    if site_packages:
-        print(f"Found site-packages at: {site_packages[0]}")
-        pkgs = [os.path.basename(p) for p in glob.glob(os.path.join(site_packages[0], "*"))]
-        print(f"Installed packages (top 10): {pkgs[:10]}")
-        if "mediapipe" in pkgs or "mediapipe-0.10.9.dist-info" in pkgs:
-            print("MediaPipe seems to be installed.")
-        else:
-            print("WARNING: MediaPipe folder NOT found in site-packages!")
-    else:
-        print("WARNING: Could not find site-packages folder!")
-except Exception as e:
-    print(f"Error checking packages: {e}")
+# 2. Check Libraries
+print("\nChecking critical libraries...")
+missing = []
 
-# 3. Test Imports Individually
-print("\nTesting individual imports...")
 try:
     import numpy
-    print("SUCCESS: import numpy")
-except ImportError as e:
-    print(f"FAIL: import numpy -> {e}")
+    print("[OK] numpy")
+except ImportError:
+    print("[FAIL] numpy")
+    missing.append("numpy")
 
 try:
     import cv2
-    print("SUCCESS: import cv2")
-except ImportError as e:
-    print(f"FAIL: import cv2 -> {e}")
+    print("[OK] cv2")
+except ImportError:
+    print("[FAIL] cv2")
+    missing.append("cv2")
 
 try:
     import mediapipe
-    print("SUCCESS: import mediapipe")
-except ImportError as e:
-    print(f"FAIL: import mediapipe -> {e}")
+    print("[OK] mediapipe")
+except ImportError:
+    print("[FAIL] mediapipe")
+    missing.append("mediapipe")
 
-# 4. Import Main
-print("\nAttempting to import main...")
+try:
+    import PIL
+    print("[OK] Pillow (PIL)")
+except ImportError:
+    print("[FAIL] Pillow")
+    missing.append("Pillow")
+
+try:
+    import pygame
+    print("[OK] pygame")
+except ImportError:
+    print("[FAIL] pygame")
+    missing.append("pygame")
+
+try:
+    import tkinter
+    print("[OK] tkinter")
+except ImportError:
+    print("[FAIL] tkinter (Required for GUI)")
+    missing.append("tkinter")
+
+if missing:
+    print(f"\nCRITICAL: The following libraries are missing: {missing}")
+    if "tkinter" in missing:
+        print("\nISSUE DETECTED: The 'Portable' Python version is missing the GUI (tkinter) library.")
+        print("SOLUTION: Unfortunately, you cannot use this Portable mode for the GUI.")
+        print("You MUST install Python 3.11 manually from python.org.")
+    input("\nPress Enter to exit...")
+    sys.exit(1)
+
+# 3. Import Main
+print("\nLibraries OK. Importing main...")
 try:
     import main
 except ImportError as e:
@@ -62,7 +74,7 @@ except ImportError as e:
     input("Press Enter to exit...")
     sys.exit(1)
 
-# 5. Run
+# 4. Run
 if __name__ == "__main__":
     print("\nStarting GUI mode...")
     sys.argv = [sys.argv[0], '--mode', 'gui']
