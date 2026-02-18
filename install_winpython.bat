@@ -2,41 +2,42 @@
 setlocal
 cd /d "%~dp0"
 
-set "WINPY_EXE=Winpython64-3.11.9.0dot.exe"
-
 echo ========================================================
-echo  MANUAL DOWNLOAD REQUIRED
+echo  MANUAL DOWNLOAD REQUIRED (Updated Link)
 echo ========================================================
 echo.
-echo The automatic download failed. Please help me:
+echo The previous link might have been broken. Please try this one:
 echo.
-echo 1. Open this link in your browser:
-echo    https://github.com/winpython/winpython/releases/download/7.2.20240427/Winpython64-3.11.9.0dot.exe
+echo OPTION A (GitHub):
+echo https://github.com/winpython/winpython/releases/download/7.2.20240427/Winpython64-3.11.9.0dot.exe
 echo.
-echo 2. Download the file (%WINPY_EXE%).
+echo OPTION B (SourceForge - Reliable):
+echo https://sourceforge.net/projects/winpython/files/WinPython_3.11/3.11.9.0/betas/Winpython64-3.11.9.0dotb5.exe/download
 echo.
-echo 3. Save/Move it into this folder:
+echo 1. Download one of these files.
+echo 2. RENAME it to: Winpython64.exe
+echo 3. Move it to this folder:
 echo    %CD%
 echo.
 echo 4. Press any key here AFTER you have done that.
 echo ========================================================
 pause
 
-IF NOT EXIST "%WINPY_EXE%" (
+if not exist "Winpython64.exe" (
     echo.
-    echo ERROR: I still cannot find "%WINPY_EXE%" in this folder.
-    echo Please make sure you moved it here.
+    echo ERROR: Could not find "Winpython64.exe".
+    echo Did you forget to rename it?
     pause
     exit /b
 )
 
 echo.
 echo Found file! Extracting...
-%WINPY_EXE% -y
+Winpython64.exe -y
 
 echo.
 echo Cleaning up installer...
-del %WINPY_EXE%
+del Winpython64.exe
 
 echo.
 echo Installing requirements...
