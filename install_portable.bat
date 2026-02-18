@@ -49,12 +49,11 @@ echo  Setup Complete!
 echo  To run the app, double-click: run_portable.bat
 echo ========================================================
 
-REM Create the runner script with explicit PYTHONPATH
+REM Create the runner script (Using Python Wrapper)
 (
 echo @echo off
 echo cd /d "%%~dp0"
-echo set PYTHONPATH=%%~dp0
-echo "python_portable\python.exe" main.py --mode gui
+echo "python_portable\python.exe" portable_launcher.py
 echo pause
 ) > run_portable.bat
 
