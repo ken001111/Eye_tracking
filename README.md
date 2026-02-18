@@ -22,6 +22,15 @@ Run the system with a single command (handles venv & dependencies automatically)
 ./run_tracking.sh
 ```
 
+## 💻 Installation on a New Machine
+1.  **Copy this folder** to the new computer.
+2.  **Install Python** (3.10+).
+3.  Open Terminal, `cd` into the folder, and run:
+    ```bash
+    ./run_tracking.sh
+    ```
+    (This script automatically sets up the virtual environment and installs all dependencies including `mediapipe`, `opencv`, `Pillow`, and `pygame`).
+
 ## System Pipeline
 
 The system processes every frame in 5 steps:
