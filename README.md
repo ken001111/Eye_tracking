@@ -23,13 +23,31 @@ Run the system with a single command (handles venv & dependencies automatically)
 ```
 
 ## 💻 Installation on a New Machine
-1.  **Copy this folder** to the new computer.
-2.  **Install Python** (3.10+).
-3.  Open Terminal, `cd` into the folder, and run:
-    ```bash
-    ./run_tracking.sh
-    ```
-    (This script automatically sets up the virtual environment and installs all dependencies including `mediapipe`, `opencv`, `Pillow`, and `pygame`).
+1.  **Copy this folder** git clone "https://github.com/ken001111/Eye_tracking.git"
+2. Make a virtual environment and install dependencies.
+    *   **Install Python** (python 3.11 recommended for this project).
+    *   **macOS / Linux**:
+        ```bash
+        python3.11 -m venv venv 
+        source venv/bin/activate
+        pip install -r requirements.txt
+        ```
+    *   **Windows**:
+        ```cmd
+        python3.11 -m venv venv
+        venv\Scripts\activate
+        pip install -r requirements.txt
+        ```
+3.  Open Terminal, `cd` into the folder, and run the startup script for your OS:
+    *   **macOS / Linux**:
+        ```bash
+        ./run_tracking.sh
+        ```
+    *   **Windows**:
+        ```cmd
+        run_tracking.bat
+        ```
+    (These scripts automatically set up the virtual environment using Python 3.11 and install all dependencies including `mediapipe`, `opencv`, `Pillow`, and `pygame`).
 
 ## System Pipeline
 
