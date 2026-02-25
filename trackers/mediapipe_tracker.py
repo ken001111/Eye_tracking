@@ -241,3 +241,83 @@ class MediaPipeTracker(BaseTracker):
             diameter = sum(radii) / len(radii) * 2.0
         
         return (int(avg_x), int(avg_y), diameter)
+
+    def get_normalized_coords(self, frame: np.ndarray, eye_side: str) -> Optional[Tuple[float, float, float, float]]:
+        """
+        Calculate landmark-based eye-coordinate normalization.
+        
+        Args:
+            frame: Input frame
+            eye_side: 'left' or 'right'
+            
+        Returns:
+            Tuple of (x_norm, y_norm, eye_width, eye_height) or None if invalid
+        """
+        if self.current_landmarks is None:
+            return None
+            
+        h, w = frame.shape[:2]
+        landmarks = self.current_landmarks.landmark
+        
+        # Get pupil center
+        pupil_data = self.get_pupil_location(frame, None, eye_side)
+        if pupil_data is None:
+            return None
+        px, py, _ = pupil_data
+        P = np.array([px, py])
+        
+        # Define landmarks based on eye side
+        # Note: MediaPipe specific indices (from user perspective looking at screen)
+        # For the person's left eye (right side of image):
+        # 133 = Inner Canthus, 33 = Outer Canthus, 159 = Upper Eyelid, 145 = Lower Eyelid
+        # For the person's right eye (left side of image):
+        # 362 = Inner Canthus, 263 = Outer Canthus, 386 = Upper Eyelid, 374 = Lower Eyelid
+        if eye_side == 'left':
+            c_in_idx, c_out_idx = 133, 33
+            l_up_idx, l_down_idx = 159, 145
+        else:
+            c_in_idx, c_out_idx = 362, 263
+            l_up_idx, l_down_idx = 386, 374
+            
+        C_in = np.array([landmarks[c_in_idx].x * w, landmarks[c_in_idx].y * h])
+        C_out = np.array([landmarks[c_out_idx].x * w, landmarks[c_out_idx].y * h])
+        L_upper = np.array([landmarks[l_up_idx].x * w, landmarks[l_up_idx].y * h])
+        L_lower = np.array([landmarks[l_down_idx].x * w, landmarks[l_down_idx].y * h])
+        
+        # 2) Build eye coordinate basis
+        u = C_out - C_in
+        eye_width = np.linalg.norm(u)
+        if eye_width < 1e-4:
+            return None
+        e1 = u / eye_width
+        
+        # Vertical axis (Option A)
+        v = L_lower - L_upper
+        eye_height = np.linalg.norm(v)
+        if eye_height < 1e-4:
+            return None
+            
+        # Gram-Schmidt to make v orthogonal to e1
+        v_orth = v - np.dot(v, e1) * e1
+        v_orth_norm = np.linalg.norm(v_orth)
+        if v_orth_norm < 1e-4:
+            return None
+        e2 = v_orth / v_orth_norm
+        
+        # Ensure consistent sign (y points down in image coords, we want positive = down like standard image processing, or up. 
+        # Standardizing: +y = "down" relative to eye frame, +x = inner to outer)
+        
+        # 3) Choose origin (midpoint)
+        O = (C_in + C_out) / 2.0
+        
+        # 4) Project pupil into eye coordinates
+        d = P - O
+        x_local = np.dot(d, e1)
+        y_local = np.dot(d, e2)
+        
+        # 5) Normalize
+        x_norm = x_local / eye_width
+        y_norm = y_local / eye_height
+        
+        return (float(x_norm), float(y_norm), float(eye_width), float(eye_height))
+

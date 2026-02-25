@@ -223,6 +223,32 @@ class GazeTracking(object):
             return right_d
         return None
 
+    def pupil_left_normalized(self):
+        """Returns the normalized pupil coordinates (x_norm, y_norm) for the left eye"""
+        if self.pupils_located and hasattr(self.tracker, 'get_normalized_coords'):
+            side_str = self._get_tracker_side_string(self.eye_left)
+            res = self.tracker.get_normalized_coords(self.frame, side_str)
+            if res is not None:
+                return (res[0], res[1])
+        return None
+
+    def pupil_right_normalized(self):
+        """Returns the normalized pupil coordinates (x_norm, y_norm) for the right eye"""
+        if self.pupils_located and hasattr(self.tracker, 'get_normalized_coords'):
+            side_str = self._get_tracker_side_string(self.eye_right)
+            res = self.tracker.get_normalized_coords(self.frame, side_str)
+            if res is not None:
+                return (res[0], res[1])
+        return None
+        
+    def left_valid(self):
+        """Returns True if the left eye is detected, pupil is found, and width/height > eps"""
+        return self.is_face_detected() and self.pupil_left_normalized() is not None
+
+    def right_valid(self):
+        """Returns True if the right eye is detected, pupil is found, and width/height > eps"""
+        return self.is_face_detected() and self.pupil_right_normalized() is not None
+
 
     def _get_eye_region_frame(self, eye_obj):
         """Extract eye region frame from Eye object for tracker analysis"""
