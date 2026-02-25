@@ -43,6 +43,7 @@ class DataLogger:
         # CSV headers
         self.headers = [
             'timestamp',
+            'frame_idx',
             'tracker_method',
             'left_pupil_x',
             'left_pupil_y',
@@ -50,7 +51,14 @@ class DataLogger:
             'right_pupil_y',
             'left_pupil_diameter',
             'right_pupil_diameter',
-            'eye_state',
+            'x_norm_L',
+            'y_norm_L',
+            'x_norm_R',
+            'y_norm_R',
+            'valid_L',
+            'valid_R',
+            'left_eye_state',
+            'right_eye_state',
             'face_detected'
         ]
         
@@ -98,9 +106,17 @@ class DataLogger:
             right_pupil_coords: Optional[tuple] = None,
             left_pupil_diameter: Optional[float] = None,
             right_pupil_diameter: Optional[float] = None,
-            eye_state: Optional[int] = None,
+            x_norm_L: Optional[float] = None,
+            y_norm_L: Optional[float] = None,
+            x_norm_R: Optional[float] = None,
+            y_norm_R: Optional[float] = None,
+            valid_L: Optional[int] = 0,
+            valid_R: Optional[int] = 0,
+            left_eye_state: Optional[int] = None,
+            right_eye_state: Optional[int] = None,
             face_detected: Optional[bool] = None,
-            timestamp: Optional[float] = None):
+            timestamp: Optional[float] = None,
+            frame_idx: Optional[int] = None):
         """
         Log a data record.
         
@@ -110,9 +126,17 @@ class DataLogger:
             right_pupil_coords: (x, y) coordinates of right pupil
             left_pupil_diameter: Diameter of left pupil in pixels
             right_pupil_diameter: Diameter of right pupil in pixels
-            eye_state: 1 for open, 0 for closed
+            x_norm_L: Normalized X coord of left eye
+            y_norm_L: Normalized Y coord of left eye
+            x_norm_R: Normalized X coord of right eye
+            y_norm_R: Normalized Y coord of right eye
+            valid_L: 1 if left eye is valid else 0
+            valid_R: 1 if right eye is valid else 0
+            left_eye_state: 1 for open, 0 for closed (Left Eye)
+            right_eye_state: 1 for open, 0 for closed (Right Eye)
             face_detected: True if face detected
             timestamp: Optional timestamp (defaults to current time)
+            frame_idx: Frame index
         """
         if not self.is_logging:
             return
@@ -130,6 +154,7 @@ class DataLogger:
         # Create record
         record = [
             timestamp_str,
+            frame_idx,
             tracker_method,
             left_x,
             left_y,
@@ -137,7 +162,14 @@ class DataLogger:
             right_y,
             left_pupil_diameter,
             right_pupil_diameter,
-            eye_state,
+            x_norm_L,
+            y_norm_L,
+            x_norm_R,
+            y_norm_R,
+            valid_L,
+            valid_R,
+            left_eye_state,
+            right_eye_state,
             face_detected
         ]
         

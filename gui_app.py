@@ -259,6 +259,7 @@ class GazeTrackingGUI:
             self.cap.set(cv2.CAP_PROP_FPS, config.WEBCAM_FPS)
             
             self.is_running = True
+            self.frame_idx = 0  # Initialize frame counter
             self.start_stop_btn.config(text="Stop Tracking")
             self.record_btn.config(state=tk.NORMAL)
             self.status_label.config(text="Tracking active", foreground="green")
@@ -344,6 +345,8 @@ class GazeTrackingGUI:
             ret, frame = self.cap.read()
             if not ret:
                 break
+                
+            self.frame_idx += 1
             
             # Process frame
             self.gaze.refresh(frame)
@@ -355,7 +358,7 @@ class GazeTrackingGUI:
             )
             self.performance_monitor.end_frame(frame_start)
             
-            # Update safety monitor
+            # Update safety monitor (still uses overall state for alarm logic)
             eye_state = self.gaze.eye_state()
             if self.safety_monitor is not None:
                 self.safety_monitor.update(
@@ -367,6 +370,24 @@ class GazeTrackingGUI:
                     frame_height=frame_height
                 )
             
+            # Gather normalized coordinates and validity
+            norm_L, norm_R = None, None
+            if hasattr(self.gaze, 'pupil_left_normalized'):
+                norm_L = self.gaze.pupil_left_normalized()
+            if hasattr(self.gaze, 'pupil_right_normalized'):
+                norm_R = self.gaze.pupil_right_normalized()
+                
+            x_norm_L = norm_L[0] if norm_L else None
+            y_norm_L = norm_L[1] if norm_L else None
+            x_norm_R = norm_R[0] if norm_R else None
+            y_norm_R = norm_R[1] if norm_R else None
+            
+            valid_L = 1 if (hasattr(self.gaze, 'left_valid') and self.gaze.left_valid()) else 0
+            valid_R = 1 if (hasattr(self.gaze, 'right_valid') and self.gaze.right_valid()) else 0
+            
+            left_eye_state = self.gaze.left_eye_state()
+            right_eye_state = self.gaze.right_eye_state()
+            
             # Log data if recording
             if self.is_recording and self.data_logger is not None:
                 self.data_logger.log(
@@ -375,8 +396,16 @@ class GazeTrackingGUI:
                     right_pupil_coords=self.gaze.pupil_right_coords(),
                     left_pupil_diameter=self.gaze.pupil_left_diameter(),
                     right_pupil_diameter=self.gaze.pupil_right_diameter(),
-                    eye_state=eye_state,
-                    face_detected=self.gaze.is_face_detected()
+                    x_norm_L=x_norm_L,
+                    y_norm_L=y_norm_L,
+                    x_norm_R=x_norm_R,
+                    y_norm_R=y_norm_R,
+                    valid_L=valid_L,
+                    valid_R=valid_R,
+                    left_eye_state=left_eye_state,
+                    right_eye_state=right_eye_state,
+                    face_detected=self.gaze.is_face_detected(),
+                    frame_idx=self.frame_idx
                 )
             
             # Update diameter data for graphs
