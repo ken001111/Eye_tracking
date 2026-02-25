@@ -77,8 +77,19 @@ The system processes every frame in 5 steps:
 
 ## Data Export
 
-CSVs are saved to `recording_output/` and contain:
-`timestamp`, `tracker_method`, `left/right_pupil_x_y`, `left/right_pupil_diameter`, `eye_state`, `face_detected`.
+CSVs are saved to `recording_output/` and contain high-precision timing, pupil geometries, and landmark-normalized coordinates.
+
+| Column | Description |
+|--------|-------------|
+| `timestamp` | Datetime down to microsecond precision. |
+| `frame_idx` | Sequential frame counter from the webcam feed. |
+| `tracker_method` | The backend tracker used (e.g. `mediapipe`). |
+| `left_pupil_x`/`y`, `right_pupil_x`/`y` | Absolute pixel coordinates of the pupil center. |
+| `left_pupil_diameter`, `right_pupil_diameter` | Estimated pupil diameter in pixels (sub-pixel accuracy). |
+| `x_norm_L`/`y_norm_L`, `x_norm_R`/`y_norm_R` | Landmark-normalized coordinates of the pupil within the defined eye geometry. |
+| `valid_L`, `valid_R` | Binary flag (1/0) indicating if the eye's normalized coordinates were safely calculated. |
+| `left_eye_state`, `right_eye_state` | Binary flag (1 = Open, 0 = Closed or Blinking) based on Eye Aspect Ratio (EAR < 0.22). |
+| `face_detected` | Boolean indicating if a face is currently tracked in the webcam area. |
 
 ## Authors
-**Jongseo Ken Lee** ([@ken001111](https://github.com/ken001111)) for **Stanford Eye Tracking Project (2026)**.
+**Jongseo Ken Lee** ([@ken001111](https://github.com/ken001111)) for **Stanford PNT Lab Eye Tracking Project (2026)**.
